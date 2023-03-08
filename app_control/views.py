@@ -117,10 +117,10 @@ class InvoiceView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        data.prop("page")
+        data.pop("page", None)
         keyword = data.pop("keyword", None)
 
-        results = self.queryset(**data)
+        results = self.queryset.filter(**data)
 
         if keyword:
             search_fields = (
