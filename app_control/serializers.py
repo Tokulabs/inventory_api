@@ -58,7 +58,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
     item_id = serializers.CharField(write_only=True)
 
     class Meta:
-        model = InvoiceItem,
+        model = InvoiceItem
         fields = "__all__"
 
 
@@ -68,7 +68,7 @@ class InvoiceItemDataSerializer(serializers.Serializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
-    create_by = CustomUserSerializer(read_only=True)
+    created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     shop = ShopSerializer(read_only=True)
     shop_id = serializers.CharField(write_only=True)
@@ -76,7 +76,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     invoice_item_data = InvoiceItemDataSerializer(write_only=True, many=True)
 
     class Meta:
-        model = Invoice,
+        model = Invoice
         fields = "__all__"
 
     def create(self, validated_data):

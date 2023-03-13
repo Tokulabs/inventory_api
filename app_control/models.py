@@ -133,43 +133,34 @@ class Invoice(models.Model):
     shop = models.ForeignKey(
         Shop, related_name="sale_shop", null=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ("-created_at",)
 
-    def save(self, *args, **kwargs):
-        action = f"added new invoice"
-        super().save(*args, **kwargs)
-        add_user_activity(self.created_by, action=action)
-
     def delete(self, *args, **kwargs):
         created_by = self.created_by
-        action = f"deleted invoice"
+        action = f"deleted invoice - '{self.id}'"
         super().delete(*args, **kwargs)
         add_user_activity(created_by, action=action)
 
 
 class InvoiceItem(models.Model):
-    Invoice = models.ForeignKey(
-        Invoice, related_name="invoice_items", on_delete=models.CASCADE)
+    invoice = models.ForeignKey(
+        Invoice, related_name="invoice_items", on_delete=models.CASCADE
+    )
     item = models.ForeignKey(
-        Inventory, null=True,
-        related_name="inventory_invoices", on_delete=models.SET_NULL
+        Inventory, null=True, related_name="inventory_invoices",
+        on_delete=models.SET_NULL
     )
     item_name = models.CharField(max_length=255, null=True)
     item_code = models.CharField(max_length=20, null=True)
     quantity = models.PositiveIntegerField()
     amount = models.FloatField(null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
         if self.item.remaining < self.quantity:
             raise Exception(
-                f"item with code {self.item.code} does not engouh quantity")
+                f"item with code {self.item.code} does not have enough quantity")
 
         self.item_name = self.item.name
         self.item_code = self.item.code
@@ -180,5 +171,5 @@ class InvoiceItem(models.Model):
 
         super().save(*args, **kwargs)
 
-        def __str__(self):
-            return f"{self.item.code - {self.quantity}}"
+    def __str__(self):
+        return f"{self.item_code} - {self.quantity}"
