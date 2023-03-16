@@ -174,14 +174,15 @@ class SalePerformance(ModelViewSet):
 
             if start_date:
                 query = query.filter(
-                    inventory_invoice__create_at__range=[start_date, end_date]
+                    inventory_invoices__created_at__range=[
+                        start_date, end_date]
                 )
 
         items = query.annotate(
             sum_of_item=Coalesce(
-                Sum("inventory_invoice__quantity"), 0
+                Sum("inventory_invoices__quantity"), 0
             )
-        ).order('-sum_of_item')[0:10]
+        ).order_by('-sum_of_item')[0:10]
 
         response_data = InventoryWithSumSerializer(items, many=True).data
         return Response(response_data)

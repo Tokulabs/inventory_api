@@ -39,7 +39,7 @@ def decodeJWT(bearer):
 
 
 class CustomPagination(PageNumberPagination):
-    page_size = 20
+    page_size = 10
 
 
 def normalize_query(query_string, findterms=re.compile(r'"([^"]+)"|(\S+)').findall, normspace=re.compile(r'\s{2,}').sub):
