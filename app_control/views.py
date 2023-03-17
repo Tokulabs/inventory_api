@@ -211,14 +211,14 @@ class SaleByShopView(ModelViewSet):
         if monthly:
             shops = query.annotate(month=TruncMonth(
                 'created_at')).values('month', 'name').annotate(amount_total=Sum(
-                    F("sale_shop__invoices_items__quantity") *
-                    F("sale_shop__invoices_items__amount")
+                    F("sale_shop__invoice_items__quantity") *
+                    F("sale_shop__invoice_items__amount")
                 ))
 
         else:
             shops = query.annotate(amount_total=Sum(
-                F("sale_shop__invoices_items__quantity") *
-                F("sale_shop__invoices_items__amount")
+                F("sale_shop__invoice_items__quantity") *
+                F("sale_shop__invoice_items__amount")
             )).order_by("-amount_total")
 
         response_data = ShopWithAmountSerializer(shops, many=True).data
