@@ -40,6 +40,19 @@ def decodeJWT(bearer):
 
 class CustomPagination(PageNumberPagination):
     page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = None
+
+    def get_page_size(self, request):
+        """
+        Return the page size to use for this request.
+        """
+        if 'page' in request.query_params:
+            # If a specific page is requested, return the configured page size
+            return self.page_size
+        else:
+            # If no page is requested, return a large value to return all results
+            return 10000
 
 
 def normalize_query(query_string, findterms=re.compile(r'"([^"]+)"|(\S+)').findall, normspace=re.compile(r'\s{2,}').sub):

@@ -56,19 +56,25 @@ class InventoryGroupView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        data.pop("page", None)
-        keyword = data.pop("keyword", None)
+        page = data.pop("page", None)
 
-        results = self.queryset.filter(**data)
+        if page is not None:
+            keyword = data.pop("keyword", None)
 
-        if keyword:
-            search_fields = (
-                "created_by__fullname", "created_by__email",
+            results = self.queryset.filter(**data).order_by('id')
+
+            if keyword:
+                search_fields = (
+                    "created_by__fullname", "created_by__email",
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+
+            return results.annotate(
+                total_items=Count('inventories')
             )
-            query = get_query(keyword, search_fields)
-            results = results.filter(query)
 
-        return results.annotate(
+        return self.queryset.order_by('id').annotate(
             total_items=Count('inventories')
         )
 
