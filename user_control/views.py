@@ -148,7 +148,7 @@ class UserActivitiesView(ModelViewSet):
 
 class UsersView(ModelViewSet):
     serializer_class = CustomUserSerializer
-    http_method_names = ["get"]
+    http_method_names = ["get", "put", "patch"]
     queryset = CustomUser.objects.all()
     permission_classes = (IsAuthenticatedCustom, )
     pagination_class = CustomPagination
@@ -170,3 +170,11 @@ class UsersView(ModelViewSet):
             results = results.filter(query)
 
         return results
+
+    def update(self, request, pk=None):
+        user = CustomUser.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(user, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

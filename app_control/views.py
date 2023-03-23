@@ -70,7 +70,7 @@ class InventoryGroupView(ModelViewSet):
                 query = get_query(keyword, search_fields)
                 results = results.filter(query)
 
-            return results.annotate(
+            return results.order_by('id').annotate(
                 total_items=Count('inventories')
             )
 
@@ -93,19 +93,23 @@ class ShopView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        data.pop("page", None)
-        keyword = data.pop("keyword", None)
+        page = data.pop("page", None)
 
-        results = self.queryset.filter(**data)
+        if page is not None:
+            keyword = data.pop("keyword", None)
 
-        if keyword:
-            search_fields = (
-                "created_by__fullname", "created_by__email", "name"
-            )
-            query = get_query(keyword, search_fields)
-            results = results.filter(query)
+            results = self.queryset.filter(**data)
 
-        return results
+            if keyword:
+                search_fields = (
+                    "created_by__fullname", "created_by__email", "name"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+
+            return results
+
+        return self.queryset.order_by('id')
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
