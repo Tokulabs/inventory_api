@@ -2,7 +2,8 @@ from django.db import models
 from django.contrib.auth.models import (
     AbstractBaseUser, PermissionsMixin, BaseUserManager)
 
-Roles = (("admin", "admin"), ("creator", "creator"), ("sale", "sale"))
+Roles = (("admin", "admin"), ("posAdmin", "posAdmin"), ("shopAdmin",
+         "shopAdmin"), ("sales", "sales"), ("supportSales", "supportSales"))
 
 
 class CustomUserManager(BaseUserManager):
@@ -29,7 +30,7 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     fullname = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=8, choices=Roles)
+    role = models.CharField(max_length=12, choices=Roles)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_staff = models.BooleanField(default=False)
