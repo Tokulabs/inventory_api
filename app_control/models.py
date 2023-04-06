@@ -133,6 +133,8 @@ class Invoice(models.Model):
     shop = models.ForeignKey(
         Shop, related_name="sale_shop", null=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
+    customer_name = models.CharField(max_length=255, null=True)
+    customer_id = models.CharField(max_length=255, null=True)
 
     class Meta:
         ordering = ("-created_at",)
