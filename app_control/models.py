@@ -54,6 +54,7 @@ class Inventory(models.Model):
     remaining = models.PositiveIntegerField(null=True)
     name = models.CharField(max_length=255)
     price = models.FloatField(default=0)
+    usd_price = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -67,13 +68,6 @@ class Inventory(models.Model):
             self.remaining = self.total
 
         super().save(*args, **kwargs)
-
-        if is_new:
-            id_length = len(str(self.id))
-            code_length = 6 - id_length
-            zeros = "".join("0" for i in range(code_length))
-            self.code = f"BOSE{zeros}{self.id}"
-            self.save()
 
         action = f"added new inventory item with code - '{self.code}'"
 
