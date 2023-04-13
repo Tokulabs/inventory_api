@@ -2,6 +2,9 @@ from django.db import models
 from user_control.models import CustomUser
 from user_control.views import add_user_activity
 
+PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
+                                                                   "debitCard"), ("nequi", "nequi"), ("bankTransfer", "bankTransfer"))
+
 
 class InventoryGroup(models.Model):
     created_by = models.ForeignKey(
@@ -138,6 +141,15 @@ class Invoice(models.Model):
         action = f"deleted invoice - '{self.id}'"
         super().delete(*args, **kwargs)
         add_user_activity(created_by, action=action)
+
+
+class PaymentMethod(models.Model):
+    invoice = models.ForeignKey(
+        Invoice, related_name="payment_methods", on_delete=models.CASCADE
+    )
+    name = models.CharField(max_length=255, choices=PaymentMethods)
+    amount = models.FloatField()
+    transaction_code = models.CharField(max_length=255, null=True)
 
 
 class InvoiceItem(models.Model):
