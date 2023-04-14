@@ -70,7 +70,8 @@ class InvoiceItemDataSerializer(serializers.Serializer):
 class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentMethod
-        fields = ["name", "amount", "transaction_code"]
+        fields = ["name", "paid_amount", "received_amount",
+                  "back_amount", "transaction_code"]
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
