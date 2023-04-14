@@ -129,6 +129,7 @@ class Invoice(models.Model):
     )
     shop = models.ForeignKey(
         Shop, related_name="sale_shop", null=True, on_delete=models.SET_NULL)
+    is_dollar = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     customer_name = models.CharField(max_length=255, null=True)
     customer_id = models.CharField(max_length=255, null=True)
@@ -148,8 +149,14 @@ class PaymentMethod(models.Model):
         Invoice, related_name="payment_methods", on_delete=models.CASCADE
     )
     name = models.CharField(max_length=255, choices=PaymentMethods)
-    amount = models.FloatField()
+    paid_amount = models.FloatField()
+    back_amount = models.FloatField()
+    received_amount = models.FloatField()
     transaction_code = models.CharField(max_length=255, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
 
 
 class InvoiceItem(models.Model):
@@ -164,6 +171,7 @@ class InvoiceItem(models.Model):
     item_code = models.CharField(max_length=20, null=True)
     quantity = models.PositiveIntegerField()
     amount = models.FloatField(null=True)
+    usd_amount = models.FloatField(null=True)
 
     def save(self, *args, **kwargs):
         if self.item.remaining < self.quantity:
@@ -174,6 +182,7 @@ class InvoiceItem(models.Model):
         self.item_code = self.item.code
 
         self.amount = self.quantity * self.item.price
+        self.usd_amount = self.quantity * self.item.usd_price
         self.item.remaining = self.item.remaining - self.quantity
         self.item.save()
 
