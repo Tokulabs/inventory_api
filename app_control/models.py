@@ -133,6 +133,8 @@ class Invoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     customer_name = models.CharField(max_length=255, null=True)
     customer_id = models.CharField(max_length=255, null=True)
+    customer_email = models.CharField(max_length=255, null=True)
+    customer_phone = models.CharField(max_length=255, null=True)
 
     class Meta:
         ordering = ("-created_at",)
