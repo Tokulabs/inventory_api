@@ -149,27 +149,28 @@ class UserActivitiesView(ModelViewSet):
 class UsersView(ModelViewSet):
     serializer_class = CustomUserSerializer
     http_method_names = ["get", "put", "patch"]
-    queryset = CustomUser.objects.all()
     permission_classes = (IsAuthenticatedCustom, )
     pagination_class = CustomPagination
 
     def get_queryset(self):
         if self.request.method.lower() != "get":
-            return self.queryset
+            return CustomUser.objects.all()
+
         data = self.request.query_params.dict()
-        data.pop("page", None)
+        role = data.pop("role", None)
+
+        queryset = CustomUser.objects.filter(is_superuser=False)
+
+        if role is not None:
+            queryset = queryset.filter(role=role)
+
         keyword = data.pop("keyword", None)
-
-        results = self.queryset.filter(**data, is_superuser=False)
-
         if keyword:
-            search_fields = (
-                "fullname", "email", "role"
-            )
+            search_fields = ("fullname", "email", "role")
             query = get_query(keyword, search_fields)
-            results = results.filter(query)
+            queryset = queryset.filter(query)
 
-        return results
+        return queryset
 
     def update(self, request, pk=None):
         user = CustomUser.objects.filter(pk=pk).first()
