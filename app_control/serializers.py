@@ -82,6 +82,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
     invoice_items = InvoiceItemSerializer(read_only=True, many=True)
     invoice_item_data = InvoiceItemDataSerializer(write_only=True, many=True)
     payment_methods = PaymentMethodSerializer(many=True)
+    sale_by = CustomUserSerializer(read_only=True)
+    sale_by_id = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Invoice

@@ -135,6 +135,8 @@ class Invoice(models.Model):
     customer_id = models.CharField(max_length=255, null=True)
     customer_email = models.CharField(max_length=255, null=True)
     customer_phone = models.CharField(max_length=255, null=True)
+    sale_by = models.ForeignKey(
+        CustomUser, related_name="sale_by", null=True, on_delete=models.SET_NULL)
 
     class Meta:
         ordering = ("-created_at",)
