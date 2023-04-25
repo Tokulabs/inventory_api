@@ -137,6 +137,7 @@ class Invoice(models.Model):
     customer_phone = models.CharField(max_length=255, null=True)
     sale_by = models.ForeignKey(
         CustomUser, related_name="sale_by", null=True, on_delete=models.SET_NULL)
+    invoice_number = models.CharField(max_length=255, unique=True, null=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -194,3 +195,25 @@ class InvoiceItem(models.Model):
 
     def __str__(self):
         return f"{self.item_code} - {self.quantity}"
+
+
+class DianResolution(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="dian_resolution",
+        on_delete=models.SET_NULL
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    document_number = models.CharField(max_length=255, unique=True)
+    from_date = models.DateField()
+    to_date = models.DateField()
+    from_number = models.PositiveIntegerField()
+    to_number = models.PositiveIntegerField()
+    current_number = models.PositiveIntegerField(default=None)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def save(self, *args, **kwargs):
+        if self.pk is None:  # se está creando un nuevo objeto
+            self.current_number = self.from_number
+        super().save(*args, **kwargs)

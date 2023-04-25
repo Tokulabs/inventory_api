@@ -1,4 +1,4 @@
-from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem
+from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution
 from user_control.serializers import CustomUserSerializer
 from rest_framework import serializers
 
@@ -116,3 +116,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 invoice=invoice, **payment_method_data)
 
         return invoice
+
+
+class DianSerializer(serializers.ModelSerializer):
+    created_by = CustomUserSerializer(read_only=True)
+    created_by_id = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = DianResolution
+        fields = "__all__"
