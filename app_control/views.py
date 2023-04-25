@@ -1,8 +1,11 @@
 from rest_framework.viewsets import ModelViewSet
+
+from app_control.models import DianResolution
+
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    ShopWithAmountSerializer, InvoiceItem
+    ShopWithAmountSerializer, InvoiceItem, DianSerializer
 )
 from rest_framework.response import Response
 from inventory_api.custom_methods import IsAuthenticatedCustom
@@ -144,6 +147,16 @@ class InvoiceView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        # Obtener la resolución actual de DIAN
+        dian_resolution = DianResolution.objects.first()
+
+        # Incrementar el número actual en 1
+        new_current_number = dian_resolution.current_number + 1
+
+        # Actualizar la resolución en la base de datos
+        dian_resolution.current_number = new_current_number
+        dian_resolution.save()
+
         return super().create(request, *args, **kwargs)
 
 
@@ -307,3 +320,22 @@ class InventoryCSVLoaderView(ModelViewSet):
         return Response({
             "success": "Inventory items added succesfully"
         })
+
+
+class DianResolutionView(ModelViewSet):
+    queryset = DianResolution.objects.all()
+    serializer_class = DianSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def get_queryset(self):
+        if self.request.method.lower() != 'get':
+            return self.queryset
+
+        data = self.request.query_params.dict()
+        results = self.queryset.filter(**data)
+
+        return results
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
