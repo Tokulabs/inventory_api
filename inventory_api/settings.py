@@ -103,7 +103,6 @@ DATABASES = {
 
 # Render PostgreSQL database (live)
 
-
 DATABASES = {
     'default': dj_database_url.parse(config('DB_EXTERNAL_URL'))
 }
