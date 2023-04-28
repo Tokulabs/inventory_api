@@ -253,14 +253,14 @@ class SaleByShopView(ModelViewSet):
                 )
 
         if monthly:
-            shops = query.annotate(month=TruncMonth(
+            shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(month=TruncMonth(
                 'created_at')).values('month', 'name').annotate(amount_total=Sum(
                     F("sale_shop__invoice_items__quantity") *
                     F("sale_shop__invoice_items__amount")
                 ))
 
         else:
-            shops = query.annotate(amount_total=Sum(
+            shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(amount_total=Sum(
                 F("sale_shop__invoice_items__quantity") *
                 F("sale_shop__invoice_items__amount")
             )).order_by("-amount_total")
@@ -288,7 +288,7 @@ class PurchaseView(ModelViewSet):
                     create_at__range=[start_date, end_date]
                 )
 
-        query = query.aggregate(
+        query = query.filter(invoice__is_override=False).aggregate(
             amount_total=Sum(
                 F('amount') * F('quantity')), total=Sum('quantity')
         )
