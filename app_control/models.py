@@ -138,6 +138,8 @@ class Invoice(models.Model):
     sale_by = models.ForeignKey(
         CustomUser, related_name="sale_by", null=True, on_delete=models.SET_NULL)
     invoice_number = models.CharField(max_length=255, unique=True, null=True)
+    dian_document_number = models.CharField(max_length=255, null=True)
+    is_override = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("-created_at",)

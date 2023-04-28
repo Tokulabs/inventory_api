@@ -1,4 +1,5 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.views import APIView
 
 from app_control.models import DianResolution
 
@@ -8,6 +9,7 @@ from .serializers import (
     ShopWithAmountSerializer, InvoiceItem, DianSerializer
 )
 from rest_framework.response import Response
+from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query
 from django.db.models import Count, Sum, F
@@ -147,17 +149,37 @@ class InvoiceView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
-        # Obtener la resolución actual de DIAN
         dian_resolution = DianResolution.objects.first()
-
-        # Incrementar el número actual en 1
         new_current_number = dian_resolution.current_number + 1
-
-        # Actualizar la resolución en la base de datos
         dian_resolution.current_number = new_current_number
         dian_resolution.save()
 
         return super().create(request, *args, **kwargs)
+
+
+class UpdateInvoiceView(APIView):
+    def patch(self, request, invoice_number):
+        try:
+            invoice = Invoice.objects.get(invoice_number=invoice_number)
+        except Invoice.DoesNotExist:
+            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if invoice.is_override:
+            return Response({"error": "Invoice already overrided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Actualizar el estado is_override de la factura a True
+        invoice.is_override = True
+
+        # Restaurar la cantidad de elementos en el inventario para los InvoiceItems correspondientes
+        for item in invoice.invoice_items.all():
+            inventory_item = item.item
+            inventory_item.remaining += item.quantity
+            inventory_item.save()
+
+        # Guardar los cambios en la base de datos
+        invoice.save()
+
+        return Response({"message": "Invoice updated successfully"}, status=status.HTTP_200_OK)
 
 
 class SummaryView(ModelViewSet):
@@ -200,8 +222,7 @@ class SalePerformance(ModelViewSet):
                     inventory_invoices__created_at__range=[
                         start_date, end_date]
                 )
-
-        items = query.annotate(
+        items = query.filter(inventory_invoices__invoice__is_override=False).annotate(
             sum_of_item=Coalesce(
                 Sum("inventory_invoices__quantity"), 0
             )
