@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query
-from django.db.models import Count, Sum, F
+from django.db.models import Count, Sum, F, Q
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
 import csv
@@ -270,6 +270,10 @@ class SaleByShopView(ModelViewSet):
 
 
 class PurchaseView(ModelViewSet):
+    from django.db.models import Q, F, Sum
+
+
+class PurchaseView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
     queryset = InvoiceView.queryset
@@ -278,24 +282,28 @@ class PurchaseView(ModelViewSet):
         query_data = request.query_params.dict()
         total = query_data.get('total', None)
         query = InvoiceItem.objects.select_related("invoice", "item")
+        start_date = query_data.get("start_date", None)
+        end_date = query_data.get("end_date", None)
 
-        if not total:
-            start_date = query_data.get("start_date", None)
-            end_date = query_data.get("end_date", None)
+        if not total and start_date:
+            query = query.filter(
+                Q(create_at__range=[start_date, end_date]) & Q(
+                    invoice__is_override=False)
+            )
+        else:
+            query = query.exclude(invoice__is_override=True)
 
-            if start_date:
-                query = query.filter(
-                    create_at__range=[start_date, end_date]
-                )
-
-        query = query.filter(invoice__is_override=False).aggregate(
-            amount_total=Sum(
-                F('amount') * F('quantity')), total=Sum('quantity')
+        results = query.aggregate(
+            amount_total=Sum(F('amount') * F('quantity')),
+            total=Sum('quantity'),
+            amount_total_usd=Sum(F('usd_amount') * F('quantity'),
+                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
         return Response({
-            "price": "0.00" if not query.get("amount_total") else query.get("amount_total"),
-            "count": 0 if not query.get("total") else query.get("total")
+            "price": "{:.2f}".format(results.get("amount_total", 0.0)),
+            "count": results.get("total", 0),
+            "price_dolar": "{:.2f}".format(results.get("amount_total_usd", 0.0))
         })
 
 

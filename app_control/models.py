@@ -62,7 +62,7 @@ class Inventory(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("-created_at",)
+        ordering = ("code",)
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -219,3 +219,50 @@ class DianResolution(models.Model):
         if self.pk is None:  # se está creando un nuevo objeto
             self.current_number = self.from_number
         super().save(*args, **kwargs)
+
+
+class StorageInventory(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="storage_inventory_items",
+        on_delete=models.SET_NULL
+    )
+    code = models.CharField(max_length=10, unique=True, null=True)
+    photo = models.TextField(blank=True, null=True)
+    group = models.ForeignKey(
+        InventoryGroup, related_name="storage_inventories", null=True, on_delete=models.SET_NULL
+    )
+    total = models.PositiveIntegerField()
+    remaining = models.PositiveIntegerField(null=True)
+    name = models.CharField(max_length=255)
+    selling_price = models.FloatField(default=0)
+    buying_price = models.FloatField(default=0)
+    usd_price = models.FloatField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        if is_new:
+            self.remaining = self.total
+
+        super().save(*args, **kwargs)
+
+        action = f"added new inventory item with code - '{self.code}'"
+
+        if not is_new:
+            action = f"updated inventory item with code - '{self.code}'"
+
+        add_user_activity(self.created_by, action=action)
+
+    def delete(self, *args, **kwargs):
+        created_by = self.created_by
+        action = f"deleted inventory - '{self.code}'"
+        super().delete(*args, **kwargs)
+        add_user_activity(created_by, action=action)
+
+    def __str__(self):
+        return f"{self.name} - {self.code}"
