@@ -173,7 +173,7 @@ class UpdateInvoiceView(APIView):
         # Restaurar la cantidad de elementos en el inventario para los InvoiceItems correspondientes
         for item in invoice.invoice_items.all():
             inventory_item = item.item
-            inventory_item.remaining += item.quantity
+            inventory_item.remaining_in_shops += item.quantity
             inventory_item.save()
 
         # Guardar los cambios en la base de datos
@@ -189,7 +189,7 @@ class SummaryView(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         total_inventory = InventoryView.queryset.filter(
-            remaining__gt=0
+            remaining_in_storage__gt=0
         ).count()
         total_group = InventoryGroupView.queryset.count()
         total_shop = ShopView.queryset.count()
@@ -270,10 +270,6 @@ class SaleByShopView(ModelViewSet):
 
 
 class PurchaseView(ModelViewSet):
-    from django.db.models import Q, F, Sum
-
-
-class PurchaseView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
     queryset = InvoiceView.queryset
@@ -300,11 +296,21 @@ class PurchaseView(ModelViewSet):
                                  filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
-        return Response({
-            "price": "{:.2f}".format(results.get("amount_total", 0.0)),
-            "count": results.get("total", 0),
-            "price_dolar": "{:.2f}".format(results.get("amount_total_usd", 0.0))
-        })
+        price = results.get("amount_total", 0.0)
+        count = results.get("total", 0)
+        price_dolar = results.get("amount_total_usd", 0.0)
+
+        response_data = {
+            "count": count,
+        }
+
+        if price is not None:
+            response_data["price"] = "{:.2f}".format(price)
+
+        if price_dolar is not None:
+            response_data["price_dolar"] = "{:.2f}".format(price_dolar)
+
+        return Response(response_data)
 
 
 class InventoryCSVLoaderView(ModelViewSet):
