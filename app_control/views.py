@@ -296,7 +296,7 @@ class PurchaseView(ModelViewSet):
                                  filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
-        price = results.get("amount_total", 0.0)
+        selling_price = results.get("amount_total", 0.0)
         count = results.get("total", 0)
         price_dolar = results.get("amount_total_usd", 0.0)
 
@@ -304,8 +304,8 @@ class PurchaseView(ModelViewSet):
             "count": count,
         }
 
-        if price is not None:
-            response_data["price"] = "{:.2f}".format(price)
+        if selling_price is not None:
+            response_data["selling_price"] = "{:.2f}".format(selling_price)
 
         if price_dolar is not None:
             response_data["price_dolar"] = "{:.2f}".format(price_dolar)
