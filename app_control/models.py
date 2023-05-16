@@ -192,7 +192,7 @@ class InvoiceItem(models.Model):
         self.item_name = self.item.name
         self.item_code = self.item.code
 
-        self.amount = self.quantity * self.item.price
+        self.amount = self.quantity * self.item.selling_price
         self.usd_amount = self.quantity * self.item.usd_price
         self.item.remaining_in_shops = self.item.remaining_in_shops - self.quantity
         self.item.save()
