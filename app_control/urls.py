@@ -19,7 +19,6 @@ router.register('top-selling', SalePerformance, "top-selling")
 router.register('invoice', InvoiceView, "invoice")
 router.register('dian-resolution', DianResolutionView, "dian-resolution")
 
-
 urlpatterns = [
     path("", include(router.urls)),
     path('update-invoice/<str:invoice_number>/',
