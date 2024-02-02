@@ -55,7 +55,7 @@ class Inventory(models.Model):
     )
     name = models.CharField(max_length=255)
     total_in_shops = models.PositiveIntegerField(default=0)
-    total_in_storage = models.PositiveIntegerField()
+    total_in_storage = models.PositiveIntegerField(default=0)
     remaining_in_shops = models.PositiveIntegerField(null=True, default=0)
     remaining_in_storage = models.PositiveIntegerField(null=True)
     selling_price = models.FloatField(default=0)
