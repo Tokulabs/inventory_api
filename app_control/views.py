@@ -20,6 +20,7 @@ import codecs
 
 
 class InventoryView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete')
     queryset = Inventory.objects.select_related("group", "created_by")
     serializer_class = InventorySerializer
     permission_classes = (IsAuthenticatedCustom,)
@@ -48,6 +49,19 @@ class InventoryView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk=None):
+        inventory = Inventory.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(inventory, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        inventory = Inventory.objects.filter(pk=pk).first()
+        inventory.delete()
+        return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class InventoryGroupView(ModelViewSet):
@@ -89,6 +103,7 @@ class InventoryGroupView(ModelViewSet):
 
 
 class ShopView(ModelViewSet):
+    http_method_names = ('get','post','put','delete')
     queryset = Shop.objects.select_related("created_by")
     serializer_class = ShopSerializer
     permission_classes = (IsAuthenticatedCustom,)

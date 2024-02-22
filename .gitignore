@@ -1,2 +1,4 @@
 *.env
 ./venv/
+app_control/migrations/__pycache__/
+**/__pycache__/

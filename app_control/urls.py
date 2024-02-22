@@ -22,5 +22,6 @@ router.register('dian-resolution', DianResolutionView, "dian-resolution")
 urlpatterns = [
     path("", include(router.urls)),
     path('update-invoice/<str:invoice_number>/',
-         UpdateInvoiceView.as_view(), name='update-invoice')
+         UpdateInvoiceView.as_view(), name='update-invoice'),
+    path('inventory/<int:pk>/', InventoryView.as_view({'put': 'update', 'delete': 'destroy'}), name='inventory-detail'),
 ]
