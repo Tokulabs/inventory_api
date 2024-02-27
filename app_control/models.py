@@ -56,8 +56,6 @@ class Inventory(models.Model):
     name = models.CharField(max_length=255)
     total_in_shops = models.PositiveIntegerField(default=0)
     total_in_storage = models.PositiveIntegerField(default=0)
-    remaining_in_shops = models.PositiveIntegerField(null=True, default=0)
-    remaining_in_storage = models.PositiveIntegerField(null=True)
     selling_price = models.FloatField(default=0)
     buying_price = models.FloatField(default=0)
     usd_price = models.FloatField(default=0)
@@ -69,10 +67,6 @@ class Inventory(models.Model):
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
-
-        if is_new:
-            self.remaining_in_storage = self.total_in_storage
-            self.remaining_in_shops = self.total_in_shops
 
         super().save(*args, **kwargs)
 
@@ -185,7 +179,7 @@ class InvoiceItem(models.Model):
     usd_amount = models.FloatField(null=True)
 
     def save(self, *args, **kwargs):
-        if self.item.remaining_in_shops < self.quantity:
+        if self.item.total_in_shops < self.quantity:
             raise Exception(
                 f"item with code {self.item.code} does not have enough quantity")
 
@@ -194,7 +188,7 @@ class InvoiceItem(models.Model):
 
         self.amount = self.quantity * self.item.selling_price
         self.usd_amount = self.quantity * self.item.usd_price
-        self.item.remaining_in_shops = self.item.remaining_in_shops - self.quantity
+        self.item.total_in_shops = self.item.total_in_shops - self.quantity
         self.item.save()
 
         super().save(*args, **kwargs)

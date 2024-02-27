@@ -20,7 +20,7 @@ import codecs
 
 
 class InventoryView(ModelViewSet):
-    http_method_names = ('get', 'put', 'delete')
+    http_method_names = ('get', 'put', 'delete', 'post')
     queryset = Inventory.objects.select_related("group", "created_by")
     serializer_class = InventorySerializer
     permission_classes = (IsAuthenticatedCustom,)
@@ -188,7 +188,7 @@ class UpdateInvoiceView(APIView):
         # Restaurar la cantidad de elementos en el inventario para los InvoiceItems correspondientes
         for item in invoice.invoice_items.all():
             inventory_item = item.item
-            inventory_item.remaining_in_shops += item.quantity
+            inventory_item.total_in_shops += item.quantity
             inventory_item.save()
 
         # Guardar los cambios en la base de datos
@@ -204,7 +204,7 @@ class SummaryView(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         total_inventory = InventoryView.queryset.filter(
-            remaining_in_storage__gt=0
+            total_in_storage=0
         ).count()
         total_group = InventoryGroupView.queryset.count()
         total_shop = ShopView.queryset.count()
