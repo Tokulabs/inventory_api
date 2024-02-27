@@ -1,7 +1,8 @@
 from django.urls import path, include
 from .views import (
     DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView, SaleByShopView,
-    InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView, PaymentTerminalView
+    InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
+    PaymentTerminalView, daily_report_export
 )
 
 from rest_framework.routers import DefaultRouter
@@ -27,4 +28,5 @@ urlpatterns = [
     path('inventory/<int:pk>/', InventoryView.as_view({'put': 'update', 'delete': 'destroy'}), name='inventory-detail'),
     path('payment-terminal/<int:pk>/', PaymentTerminalView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='payment-terminal-detail'),
+    path('daily_report_export/', daily_report_export, name='daily_report_export')
 ]

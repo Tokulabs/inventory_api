@@ -1,3 +1,8 @@
+from datetime import datetime
+
+from openpyxl.styles import Font, Alignment
+from openpyxl.styles.fills import PatternFill
+from openpyxl.utils import get_column_letter
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
@@ -11,12 +16,15 @@ from .serializers import (
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
-from inventory_api.utils import CustomPagination, get_query
+from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
+    create_cash_report
 from django.db.models import Count, Sum, F, Q
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
 import csv
 import codecs
+from django.http import HttpResponse
+from openpyxl import Workbook
 
 
 class InventoryView(ModelViewSet):
@@ -436,3 +444,43 @@ class DianResolutionView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+
+
+def daily_report_export(request):
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="reporte_diario.xlsx"'
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "REPORTE DIARIO"
+    ws.column_dimensions[get_column_letter(2)].width = 27
+
+    create_terminals_report(ws)
+    create_dollars_report(ws)
+    create_cash_report(ws)
+
+
+    columns = [
+        "Fecha", "Nombre del Cliente", "Email del Cliente", "# de Factura",
+        "Numero Documento DIAN", "Tienda"
+    ]
+
+    ws.append(columns)
+
+    data = Invoice.objects.select_related("shop").all().values_list(
+        "created_at", "customer_name", "customer_email", "invoice_number", "dian_document_number", "shop__name"
+    )
+
+    print(Invoice.objects.select_related("shop", "InvoiceItem").all().values_list(
+        "created_at", "customer_name", "customer_email", "invoice_number", "dian_document_number", "shop__name",
+        "invoice_items__item_name", "invoice_items__quantity", "invoice_items__amount"
+    ))
+
+    # for item in data:
+    #     # if created_at then parse to string
+    #     item = list(item)
+    #     item[0] = item[0].strftime("%Y-%m-%d")
+    #     ws.append(item)
+
+    wb.save(response)
+    return response
