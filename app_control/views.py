@@ -204,7 +204,7 @@ class SummaryView(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         total_inventory = InventoryView.queryset.filter(
-            total_in_storage=0
+            total_in_storage__gt=0
         ).count()
         total_group = InventoryGroupView.queryset.count()
         total_shop = ShopView.queryset.count()
