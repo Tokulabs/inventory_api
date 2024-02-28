@@ -1,4 +1,5 @@
-from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution
+from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, \
+    PaymentTerminal
 from user_control.serializers import CustomUserSerializer
 from rest_framework import serializers
 
@@ -72,6 +73,15 @@ class PaymentMethodSerializer(serializers.ModelSerializer):
         model = PaymentMethod
         fields = ["name", "paid_amount", "received_amount",
                   "back_amount", "transaction_code"]
+
+
+class PaymentTerminalSerializer(serializers.ModelSerializer):
+    created_by = CustomUserSerializer(read_only=True)
+    created_by_id = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = PaymentTerminal
+        fields = "__all__"
 
 
 class InvoiceSerializer(serializers.ModelSerializer):

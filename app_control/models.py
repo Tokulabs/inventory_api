@@ -120,6 +120,35 @@ class Shop(models.Model):
         return self.name
 
 
+class PaymentTerminal(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="payment_terminals",
+        on_delete=models.SET_NULL
+    )
+    account_code = models.CharField(max_length=200, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    is_wireless = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        action = f"added new payment terminal with name - '{self.name}'"
+        if not is_new:
+            action = f"updated payment terminal item with name - '{self.name}'"
+        add_user_activity(self.created_by, action=action)
+
+    def delete(self, *args, **kwargs):
+        created_by = self.created_by
+        action = f"deleted payment terminal with name - '{self.name}'"
+        super().delete(*args, **kwargs)
+        add_user_activity(created_by, action=action)
+
+
 class Invoice(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="invoices",
