@@ -156,6 +156,8 @@ class Invoice(models.Model):
     )
     shop = models.ForeignKey(
         Shop, related_name="sale_shop", null=True, on_delete=models.SET_NULL)
+    payment_terminal = models.ForeignKey(
+        PaymentTerminal, related_name="payment_terminal", null=True, on_delete=models.SET_NULL)
     is_dollar = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     customer_name = models.CharField(max_length=255, null=True)
