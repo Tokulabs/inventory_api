@@ -185,7 +185,7 @@ class PaymentTerminalView(ModelViewSet):
 
 class InvoiceView(ModelViewSet):
     queryset = Invoice.objects.select_related(
-        "created_by", "shop", "sale_by").prefetch_related("invoice_items")
+        "created_by", "shop", "sale_by", "payment_terminal").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
