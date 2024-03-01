@@ -355,7 +355,7 @@ class PurchaseView(ModelViewSet):
             amount_total=Sum(F('amount') * F('quantity')),
             total=Sum('quantity'),
             amount_total_usd=Sum(F('usd_amount') * F('quantity'),
-                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False))
+                                 filter=Q(invoice__is_dolar=True, invoice__is_override=False))
         )
 
         selling_price = results.get("amount_total", 0.0)
