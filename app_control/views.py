@@ -1,12 +1,12 @@
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution
+from app_control.models import DianResolution, PaymentTerminal
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    ShopWithAmountSerializer, InvoiceItem, DianSerializer
+    ShopWithAmountSerializer, InvoiceItem, DianSerializer, PaymentTerminalSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -20,6 +20,7 @@ import codecs
 
 
 class InventoryView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
     queryset = Inventory.objects.select_related("group", "created_by")
     serializer_class = InventorySerializer
     permission_classes = (IsAuthenticatedCustom,)
@@ -48,6 +49,19 @@ class InventoryView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk=None):
+        inventory = Inventory.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(inventory, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        inventory = Inventory.objects.filter(pk=pk).first()
+        inventory.delete()
+        return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class InventoryGroupView(ModelViewSet):
@@ -89,6 +103,7 @@ class InventoryGroupView(ModelViewSet):
 
 
 class ShopView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
     queryset = Shop.objects.select_related("created_by")
     serializer_class = ShopSerializer
     permission_classes = (IsAuthenticatedCustom,)
@@ -121,9 +136,56 @@ class ShopView(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
 
+class PaymentTerminalView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
+    queryset = PaymentTerminal.objects.select_related("created_by")
+    serializer_class = PaymentTerminalSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        if self.request.method.lower() != "get":
+            return self.queryset
+        data = self.request.query_params.dict()
+        page = data.pop("page", None)
+
+        if page is not None:
+            keyword = data.pop("keyword", None)
+
+            results = self.queryset.filter(**data)
+
+            if keyword:
+                search_fields = (
+                    "created_by__fullname", "created_by__email", "name"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+
+            return results
+
+        return self.queryset.order_by('id')
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk=None):
+        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(terminal, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        terminal.delete()
+        return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
+
+
 class InvoiceView(ModelViewSet):
     queryset = Invoice.objects.select_related(
-        "created_by", "shop", "sale_by").prefetch_related("invoice_items")
+        "created_by", "shop", "sale_by", "payment_terminal").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
@@ -173,7 +235,7 @@ class UpdateInvoiceView(APIView):
         # Restaurar la cantidad de elementos en el inventario para los InvoiceItems correspondientes
         for item in invoice.invoice_items.all():
             inventory_item = item.item
-            inventory_item.remaining_in_shops += item.quantity
+            inventory_item.total_in_shops += item.quantity
             inventory_item.save()
 
         # Guardar los cambios en la base de datos
@@ -189,7 +251,7 @@ class SummaryView(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         total_inventory = InventoryView.queryset.filter(
-            remaining_in_storage__gt=0
+            total_in_storage__gt=0
         ).count()
         total_group = InventoryGroupView.queryset.count()
         total_shop = ShopView.queryset.count()
@@ -255,9 +317,9 @@ class SaleByShopView(ModelViewSet):
         if monthly:
             shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(month=TruncMonth(
                 'created_at')).values('month', 'name').annotate(amount_total=Sum(
-                    F("sale_shop__invoice_items__quantity") *
-                    F("sale_shop__invoice_items__amount")
-                ))
+                F("sale_shop__invoice_items__quantity") *
+                F("sale_shop__invoice_items__amount")
+            ))
 
         else:
             shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(amount_total=Sum(
@@ -293,7 +355,7 @@ class PurchaseView(ModelViewSet):
             amount_total=Sum(F('amount') * F('quantity')),
             total=Sum('quantity'),
             amount_total_usd=Sum(F('usd_amount') * F('quantity'),
-                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False))
+                                 filter=Q(invoice__is_dolar=True, invoice__is_override=False))
         )
 
         selling_price = results.get("amount_total", 0.0)
