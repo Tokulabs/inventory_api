@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
@@ -455,32 +455,36 @@ def daily_report_export(request):
     ws.title = "REPORTE DIARIO"
     ws.column_dimensions[get_column_letter(2)].width = 27
 
-    create_terminals_report(ws)
-    create_dollars_report(ws)
-    create_cash_report(ws)
+    terminals_report_data = (
+            Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
+            .all()
+            .filter(created_at__date=datetime.now().date() - timedelta(days=2))
+            .filter(payment_methods__name="creditCard")
+            .values_list("payment_terminal__name", "created_by__fullname")
+            .annotate(
+                quantity=Count("id"),
+                total=Sum("payment_methods__paid_amount")
+            )
+        )
 
+    last_row = create_terminals_report(ws, terminals_report_data)
 
-    columns = [
-        "Fecha", "Nombre del Cliente", "Email del Cliente", "# de Factura",
-        "Numero Documento DIAN", "Tienda"
-    ]
-
-    ws.append(columns)
-
-    data = Invoice.objects.select_related("shop").all().values_list(
-        "created_at", "customer_name", "customer_email", "invoice_number", "dian_document_number", "shop__name"
+    dollar_report_data = (
+        Invoice.objects.select_related("InvoiceItems", "created_by")
+        .all()
+        .filter(created_at__date=datetime.now().date())
+        .filter(is_dolar=True)
+        .values_list("created_by__fullname")
+        .annotate(
+            quantity=Sum("invoice_items__usd_amount")
+        )
     )
 
-    print(Invoice.objects.select_related("shop", "InvoiceItem").all().values_list(
-        "created_at", "customer_name", "customer_email", "invoice_number", "dian_document_number", "shop__name",
-        "invoice_items__item_name", "invoice_items__quantity", "invoice_items__amount"
-    ))
+    print(dollar_report_data)
 
-    # for item in data:
-    #     # if created_at then parse to string
-    #     item = list(item)
-    #     item[0] = item[0].strftime("%Y-%m-%d")
-    #     ws.append(item)
+    create_dollars_report(ws, dollar_report_data, last_row)
+    create_cash_report(ws)
+
 
     wb.save(response)
     return response
