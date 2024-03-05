@@ -6,7 +6,7 @@ from app_control.models import DianResolution, PaymentTerminal
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    ShopWithAmountSerializer, InvoiceItem, DianSerializer, PaymentTerminalSerializer
+    InvoiceItem, DianSerializer, PaymentTerminalSerializer, UserWithAmounSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -161,7 +161,7 @@ class PaymentTerminalView(ModelViewSet):
                 query = get_query(keyword, search_fields)
                 results = results.filter(query)
 
-            return results
+            return results.order_by('id')
 
         return self.queryset.order_by('id')
 
@@ -185,7 +185,7 @@ class PaymentTerminalView(ModelViewSet):
 
 class InvoiceView(ModelViewSet):
     queryset = Invoice.objects.select_related(
-        "created_by", "shop", "sale_by", "payment_terminal").prefetch_related("invoice_items")
+        "created_by", "sale_by", "payment_terminal").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
@@ -202,7 +202,7 @@ class InvoiceView(ModelViewSet):
 
         if keyword:
             search_fields = (
-                "created_by__fullname", "created_by__email", "shop__name"
+                "created_by__fullname", "created_by__email",
             )
             query = get_query(keyword, search_fields)
             results = results.filter(query)
@@ -292,18 +292,16 @@ class SalePerformance(ModelViewSet):
 
         response_data = InventoryWithSumSerializer(items, many=True).data
         return Response(response_data)
-
-
-class SaleByShopView(ModelViewSet):
+    
+class SalesByUsersView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
-    queryset = InventoryView.queryset
+    queryset = CustomUser.objects.filter(is_superuser=False)
 
     def list(self, request, *args, **kwargs):
         query_data = request.query_params.dict()
         total = query_data.get('total', None)
-        monthly = query_data.get('monthly', None)
-        query = ShopView.queryset
+        query = self.queryset
 
         if not total:
             start_date = query_data.get("start_date", None)
@@ -311,23 +309,16 @@ class SaleByShopView(ModelViewSet):
 
             if start_date:
                 query = query.filter(
-                    sale_shop__create_at__range=[start_date, end_date]
+                    invoices__created_at__range=[
+                        start_date, end_date]
                 )
+        users = query.filter(invoices__is_override=False).annotate(
+            sum_of_item=Coalesce(
+                Sum("invoices__invoice_items__quantity"), 0
+            )
+        ).order_by('-sum_of_item')[0:10]
 
-        if monthly:
-            shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(month=TruncMonth(
-                'created_at')).values('month', 'name').annotate(amount_total=Sum(
-                F("sale_shop__invoice_items__quantity") *
-                F("sale_shop__invoice_items__amount")
-            ))
-
-        else:
-            shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(amount_total=Sum(
-                F("sale_shop__invoice_items__quantity") *
-                F("sale_shop__invoice_items__amount")
-            )).order_by("-amount_total")
-
-        response_data = ShopWithAmountSerializer(shops, many=True).data
+        response_data = UserWithAmounSerializer(users, many=True).data
         return Response(response_data)
 
 
@@ -355,7 +346,7 @@ class PurchaseView(ModelViewSet):
             amount_total=Sum(F('amount') * F('quantity')),
             total=Sum('quantity'),
             amount_total_usd=Sum(F('usd_amount') * F('quantity'),
-                                 filter=Q(invoice__is_dolar=True, invoice__is_override=False))
+                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
         selling_price = results.get("amount_total", 0.0)
