@@ -1,5 +1,4 @@
-from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, \
-    PaymentTerminal
+from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, PaymentTerminal
 from user_control.serializers import CustomUserSerializer
 from rest_framework import serializers
 
@@ -46,11 +45,9 @@ class ShopSerializer(serializers.ModelSerializer):
         model = Shop
         fields = "__all__"
 
-
-class ShopWithAmountSerializer(ShopSerializer):
-    amount_total = serializers.FloatField()
-    month = serializers.CharField(required=False)
-
+class UserWithAmounSerializer(serializers.Serializer):
+    user = CustomUserSerializer()
+    amount = serializers.FloatField()
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
     invoice = serializers.CharField(read_only=True)
@@ -87,8 +84,6 @@ class PaymentTerminalSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
-    shop = ShopSerializer(read_only=True)
-    shop_id = serializers.CharField(write_only=True)
     payment_terminal = PaymentTerminalSerializer(read_only=True)
     payment_terminal_id = serializers.CharField(write_only=True)
     invoice_items = InvoiceItemSerializer(read_only=True, many=True)

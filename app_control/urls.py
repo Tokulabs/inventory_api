@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import (
-    DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView, SaleByShopView,
+    DianResolutionView, InventoryView, SalesByUsersView, ShopView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView, PaymentTerminalView
 )
 
@@ -13,12 +13,12 @@ router.register('inventory-csv', InventoryCSVLoaderView, "inventory-csv")
 router.register('shop', ShopView, "shop")
 router.register('summary', SummaryView, "summary")
 router.register('purchase-summary', PurchaseView, "purchase-summary")
-router.register('sales-by-shop', SaleByShopView, "sales-by-shop")
 router.register('group', InventoryGroupView, "group")
 router.register('top-selling', SalePerformance, "top-selling")
 router.register('invoice', InvoiceView, "invoice")
 router.register('dian-resolution', DianResolutionView, "dian-resolution")
 router.register('payment-terminal', PaymentTerminalView, "payment-terminal")
+router.register('sales-by-user', SalesByUsersView, "sales-by-user")
 
 urlpatterns = [
     path("", include(router.urls)),
