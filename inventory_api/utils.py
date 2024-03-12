@@ -4,10 +4,21 @@ from django.conf import settings
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
+from inventory_api.excel_manager import add_values_to_row_multiple_columns, apply_styles_to_cells, sum_formula_text, \
+    add_values_to_col_multiple_rows
 from user_control.models import CustomUser
 from rest_framework.pagination import PageNumberPagination
 import re
 from django.db.models import Q
+
+# Excel styles
+title_report_font: Font = Font(color="FFFFFF", bold=True)
+title_report_fill = PatternFill(start_color="0000FF", end_color="0000FF", fill_type="solid")
+headers_font = Font(color="000000", bold=True)
+headers_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+totals_fill = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
+date_font = Font(color="FFFFFF", bold=True)
+alignment = Alignment(horizontal='center', vertical='center')
 
 
 def get_access_token(payload, days):
@@ -83,40 +94,26 @@ def get_query(query_string, search_fields):
 
 def create_terminals_report(ws, report_data):
     current_date = datetime.now().strftime("%Y-%m-%d")
-
-    ws['A1'] = "VENTA EN TARJETAS"
-
-    ws.merge_cells('A1:C1')
-    font_ventas_title = Font(color="FFFFFF", bold=True)
-    fill_ventas_title = PatternFill(start_color="0000FF", end_color="0000FF", fill_type="solid")
-
-    for cell in ws['A1:C1']:
-        for c in cell:
-            c.font = font_ventas_title
-            c.fill = fill_ventas_title
-            c.alignment = Alignment(horizontal='center', vertical='center')
-
-    ws['D1'] = current_date
-    ws.merge_cells('D1:E1')
-    font_date = Font(color="FFFFFF", bold=True)
-    fill_date = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
-    ws['D1'].font = font_date
-    ws['D1'].fill = fill_date
-    ws['D1'].alignment = Alignment(horizontal='center', vertical='center')
-
     users = sorted(set([item[1].upper() for item in report_data]))
-    second_row_text = ["CANT", "DATAFONO"]
-    second_row_text = second_row_text + list(users)
-    second_row_text.append("TOTAL DIA")
-    ws.append(second_row_text)
-    font_headers = Font(color="000000", bold=True)
-    fill_headers = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
-    for col in range(1, second_row_text.__len__() + 1):
-        cell = ws.cell(row=2, column=col)
-        cell.font = font_headers
-        cell.fill = fill_headers
-        cell.alignment = Alignment(horizontal='center', vertical='center')
+    second_row_text = ["CANT", "DATAFONO"] + list(users) + ["TOTAL DIA"]
 
+    # add report title and date and their styles
+    ws['A1'] = "VENTA EN TARJETAS"
+    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + '1'] = current_date
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2 + len(users))
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=2 + len(users), end_row=1,
+                          ws=ws, font=title_report_font, alignment=alignment, fill=title_report_fill)
+    # apply style to date
+    apply_styles_to_cells(start_column=second_row_text.index("TOTAL DIA") + 1, start_row=1,
+                          end_column=second_row_text.index("TOTAL DIA") + 1, end_row=1,
+                            ws=ws, font=date_font, alignment=alignment, fill=totals_fill)
+
+    # add values and styles to headers
+    add_values_to_row_multiple_columns(1, 2, second_row_text, ws)
+    apply_styles_to_cells(start_column=1, start_row=2, end_column=len(second_row_text), end_row=2, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill)
+
+    # add dynamic values based in the report data
     updated_rows = []
     created_rows = []
     terminals_drawn = {}
@@ -132,33 +129,45 @@ def create_terminals_report(ws, report_data):
             ws.cell(row=terminals_drawn.get(item[0]), column=second_row_text.index(item[1].upper()) + 1, value=item[3])
             ws.cell(row=terminals_drawn.get(item[0]), column=second_row_text.index("TOTAL DIA") + 1, value="function")
             updated_rows.append(row_idx)
-
         terminals_drawn[item[0]] = row_idx
 
+    # compute new rows to write to
     new_created_rows = []
-    for row in created_rows:
-        for to_delete_column in updated_rows:
-            if row > to_delete_column:
-                new_created_rows.append(row - 1)
-            else:
-                new_created_rows.append(row)
+    if updated_rows:
+        for row in created_rows:
+            for to_delete_column in updated_rows:
+                if row > to_delete_column:
+                    new_created_rows.append(row - 1)
+                else:
+                    new_created_rows.append(row)
+    else:
+        new_created_rows = created_rows
 
+    # delete rows that were updated
     for row_idx in updated_rows:
         ws.delete_rows(row_idx)
 
-    ws.cell(row=new_created_rows[-1] + 1, column=2, value="TOTAL VENTA TARJETAS")
-    ws.cell(row=new_created_rows[-1] + 1, column=3, value=f'=SUM(C{new_created_rows[0]}:C{new_created_rows[-1]})')
-    ws.cell(row=new_created_rows[-1] + 1, column=4, value=f'=SUM(D{new_created_rows[0]}:D{new_created_rows[-1]})')
-    ws.cell(row=new_created_rows[-1] + 1, column=5,
-            value=f'=SUM(C{new_created_rows[-1] + 1}:D{new_created_rows[-1] + 1})')
+    # add values to total column
+    total_formulas_total_column = []
+    for row in new_created_rows:
+        total_formulas_total_column.append(sum_formula_text(row, row, 3, second_row_text.index("TOTAL DIA")))
+    add_values_to_col_multiple_rows(second_row_text.index("TOTAL DIA") + 1, new_created_rows[0],
+                                    total_formulas_total_column, ws)
 
-    for row_idx in range(new_created_rows[0], new_created_rows[-1] + 1):
-        ws.cell(row=row_idx, column=second_row_text.index("TOTAL DIA") + 1,
-                value=f'=SUM(C{row_idx}:{get_column_letter(second_row_text.index("TOTAL DIA"))}{row_idx})')
+    # add values to total rows
+    total_formulas_last_row = ["TOTAL VENTA TARJETAS"]
+    for index, user in enumerate(second_row_text[2:], start=2):
+        start_column = index + 1
+        total_formulas_last_row.append(
+            sum_formula_text(new_created_rows[0], new_created_rows[-1], start_column, start_column))
 
-    for col_idx in range(1, 6):
-        ws.cell(row=new_created_rows[-1] + 1, column=col_idx).font = Font(bold=True)
-        ws.cell(row=new_created_rows[-1] + 1, column=col_idx).fill = fill_date
+    totals_start_column = second_row_text.index("DATAFONO") + 1
+    add_values_to_row_multiple_columns(totals_start_column, new_created_rows[-1] + 1, total_formulas_last_row, ws)
+
+    # apply styles to totals row
+    apply_styles_to_cells(start_column=1, start_row=new_created_rows[-1] + 1, end_column=len(second_row_text),
+                          end_row=new_created_rows[-1] + 1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=totals_fill)
 
     return new_created_rows[-1] + 2
 
@@ -166,135 +175,78 @@ def create_terminals_report(ws, report_data):
 def create_dollars_report(ws, report_data, last_row):
     beginning_row = last_row + 1
     current_date = datetime.now().strftime("%Y-%m-%d")
-    ws[f'A{beginning_row}'] = "VENTAS EN DOLARES"
-    ws.merge_cells(f'A{beginning_row}:C{beginning_row}')
-    font = Font(color="FFFFFF", bold=True)
-    fill = PatternFill(start_color="0000FF", end_color="0000FF", fill_type="solid")
-
-    for cell in ws[f'A{beginning_row}:C{beginning_row}']:
-        for c in cell:
-            c.font = font
-            c.fill = fill
-            c.alignment = Alignment(horizontal='center', vertical='center')
-
-    ws[f'D{beginning_row}'] = current_date
-    ws.merge_cells(f'D{beginning_row}:E{beginning_row}')
-    font_date = Font(color="FFFFFF", bold=True)
-    fill_date = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
-    for cell in ws[f'D{beginning_row}:E{beginning_row}']:
-        for c in cell:
-            c.font = font_date
-            c.fill = fill_date
-            c.alignment = Alignment(horizontal='center', vertical='center')
-
     users = sorted([item[0].upper() for item in report_data])
-    second_row_text = ["CANT", "NOMBRE"]
-    second_row_text = second_row_text + users
-    second_row_text.append("TOTAL DIA")
+    second_row_text = ["CANT", "NOMBRE"] + users + ["TOTAL DIA"]
 
-    ws.append(second_row_text)
+    # add report title and date
+    ws[f'A{beginning_row}'] = "VENTAS EN DOLARES"
+    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + f'{beginning_row}'] = current_date
+    ws.merge_cells(start_row=beginning_row, start_column=1, end_row=beginning_row, end_column=2 + len(users))
 
-    font_headers = Font(color="000000", bold=True)
-    fill_headers = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
-    for col in range(1, 6):
-        cell = ws.cell(row=beginning_row+1, column=col)
-        cell.font = font_headers
-        cell.fill = fill_headers
-        cell.alignment = Alignment(horizontal='center', vertical='center')
+    # apply styles to title and date
+    apply_styles_to_cells(start_column=1, start_row=beginning_row, end_column=2 + len(users), end_row=beginning_row,
+                          ws=ws, font=title_report_font, alignment=alignment, fill=title_report_fill)
+    apply_styles_to_cells(start_column=second_row_text.index("TOTAL DIA") + 1, start_row=beginning_row,
+                          end_column=second_row_text.index("TOTAL DIA") + 1, end_row=beginning_row,
+                          ws=ws, font=date_font, alignment=alignment, fill=totals_fill)
 
-    values = [
-        ("", "TOTAL VENTA DOLARES"),
-        ("", "FALTANTE (MENOS)"),
-        ("", "SOBRANTE (MAS)"),
-        ("", "TOTAL ENTREGADO DOLARES")
-    ]
+    # add values and styles to headers
+    add_values_to_row_multiple_columns(1, beginning_row + 1, second_row_text, ws)
+    apply_styles_to_cells(start_column=1, start_row=beginning_row + 1, end_column=len(second_row_text),
+                          end_row=beginning_row + 1, ws=ws, font=headers_font, alignment=alignment, fill=headers_fill)
 
-    for row_idx, (value1, value2) in enumerate(values, start=beginning_row+2):
-        ws.cell(row=row_idx, column=1, value=value1)
-        ws.cell(row=row_idx, column=2, value=value2)
-        if row_idx in (14, 17):
-            for col_idx in range(1, 6):
-                ws.cell(row=row_idx, column=col_idx).font = Font(bold=True)
-                ws.cell(row=row_idx, column=col_idx).fill = fill_date
+    # add row titles to column 2
+    row_titles = ["TOTAL VENTA DOLARES", "FALTANTE (MENOS)", "SOBRANTE (MAS)", "TOTAL ENTREGADO DOLARES"]
+    add_values_to_col_multiple_rows(2, beginning_row + 2, row_titles, ws)
 
+    # add dynamic values based in the report data depending on amount of users
     for item in report_data:
-        ws.cell(row=beginning_row+2, column=second_row_text.index(item[0].upper()) + 1, value=item[1])
+        ws.cell(row=beginning_row + 2, column=second_row_text.index(item[0].upper()) + 1, value=item[1])
 
-    column_for_functions = get_column_letter(second_row_text.index("TOTAL DIA"))
-    column_for_functions_begin = get_column_letter(second_row_text.index("NOMBRE") + 2)
-    column_for_functions_index_begin = second_row_text.index("NOMBRE") + 2
-    column_for_functions_index = second_row_text.index("TOTAL DIA") + 1
+    # add formulas to total column
+    total_formulas_total_column = []
+    for row in range(beginning_row + 2, beginning_row + 6):
+        total_formulas_total_column.append(sum_formula_text(row, row, 3, second_row_text.index("TOTAL DIA")))
+    add_values_to_col_multiple_rows(second_row_text.index("TOTAL DIA") + 1, beginning_row + 2,
+                                    total_formulas_total_column, ws)
 
-    ws.cell(row=beginning_row+2, column=column_for_functions_index,
-            value=f'=SUM({column_for_functions_begin}{beginning_row+2}:{column_for_functions}{beginning_row+2})')
-    ws.cell(row=beginning_row+3, column=column_for_functions_index,
-            value=f'=SUM({column_for_functions_begin}{beginning_row+3}:{column_for_functions}{beginning_row+3})')
-    ws.cell(row=beginning_row+4, column=column_for_functions_index,
-            value=f'=SUM({column_for_functions_begin}{beginning_row+4}:{column_for_functions}{beginning_row+4})')
-    ws.cell(row=beginning_row + 5, column=column_for_functions_index,
-            value=f'=SUM({column_for_functions_begin}{beginning_row + 5}:{column_for_functions}{beginning_row + 5})')
+    # add formulas to total row
+    total_formulas_last_row = []
+    for index, user in enumerate(second_row_text[2:], start=2):
+        start_column = index + 1
+        total_formulas_last_row.append(
+            sum_formula_text(beginning_row + 2, beginning_row + 4, start_column, start_column))
+    add_values_to_row_multiple_columns(3, beginning_row + 5, total_formulas_last_row, ws)
 
-    for col_idx, user in enumerate(users, start=column_for_functions_index_begin):
-        column_letter = get_column_letter(col_idx)
-        ws.cell(row=beginning_row + 5, column=col_idx,
-                value=f'=SUM({column_letter}{beginning_row + 2}:{column_letter}{beginning_row + 4})')
+    # apply styles to totals row
+    apply_styles_to_cells(start_column=1, start_row=beginning_row + 5, end_column=len(second_row_text),
+                          end_row=beginning_row + 5, ws=ws,
+                          font=headers_font, alignment=alignment, fill=totals_fill)
+
+    return beginning_row + 6
 
 
-def create_cash_report(ws):
+def create_cash_report(ws, last_row, report_data):
+    beginning_row = last_row + 1
     current_date = datetime.now().strftime("%Y-%m-%d")
-    ws['A19'] = "VENTAS DIARIAS"
-    ws.merge_cells('A19:C19')
-    font = Font(color="FFFFFF", bold=True)
-    fill = PatternFill(start_color="0000FF", end_color="0000FF", fill_type="solid")
+    users = sorted([item[0].upper() for item in report_data])
+    second_row_text = ["ITEM", "NOMBRE"] + users + ["TOTAL DIA"]
 
-    for cell in ws['A19:C19']:
-        for c in cell:
-            c.font = font
-            c.fill = fill
-            c.alignment = Alignment(horizontal='center', vertical='center')
+    # add report title and date
+    ws[f'A{beginning_row}'] = "VENTAS DIARIAS"
+    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + f'{beginning_row}'] = current_date
+    ws.merge_cells(start_row=beginning_row, start_column=1, end_row=beginning_row, end_column=2 + len(users))
 
-    ws['D19'] = current_date
-    ws.merge_cells('D19:E19')
-    font_date = Font(color="FFFFFF", bold=True)
-    fill_date = PatternFill(start_color="FFA500", end_color="FFA500", fill_type="solid")
-    for cell in ws['D19:E19']:
-        for c in cell:
-            c.font = font_date
-            c.fill = fill_date
-            c.alignment = Alignment(horizontal='center', vertical='center')
+    # apply styles to title and date
+    apply_styles_to_cells(start_column=1, start_row=beginning_row, end_column=2 + len(users), end_row=beginning_row,
+                          ws=ws, font=title_report_font, alignment=alignment, fill=title_report_fill)
+    apply_styles_to_cells(start_column=second_row_text.index("TOTAL DIA") + 1, start_row=beginning_row,
+                          end_column=second_row_text.index("TOTAL DIA") + 1, end_row=beginning_row,
+                          ws=ws, font=date_font, alignment=alignment, fill=totals_fill)
 
-    second_row_text = ["ITEM", "NOMBRE", "CAJA 1", "CAJA 2", "TOTAL DIA"]
-    for i, value in enumerate(second_row_text):
-        cell = ws.cell(row=20, column=i + 1)
-        cell.value = value
+    # add values and styles to headers
+    add_values_to_row_multiple_columns(1, beginning_row + 1, second_row_text, ws)
+    apply_styles_to_cells(start_column=1, start_row=beginning_row + 1, end_column=len(second_row_text),
+                          end_row=beginning_row + 1, ws=ws, font=headers_font, alignment=alignment, fill=headers_fill)
 
-    font_headers = Font(color="000000", bold=True)
-    fill_headers = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
-    for col in range(1, 6):
-        cell = ws.cell(row=20, column=col)
-        cell.font = font_headers
-        cell.fill = fill_headers
-        cell.alignment = Alignment(horizontal='center', vertical='center')
 
-    values = [
-        ("1", "TOTAL DIA POS"),
-        ("2", "DOLAR EQUIVALENTE $ (MENOS)"),
-        ("3", "VENTAS TARJETAS (MENOS)"),
-        ("4", "VENTAS DATAF INALAMBRICO AZUL"),
-        ("5", "TRANSFERENCIA QR CTA AHORROS"),
-        ("6", "OTROS DCTOS"),
-        ("", "SUBTOTAL"),
-        ("7", "PAGO APOYO VENTAS (MENOS)"),
-        ("", "TOTAL EN PESOS"),
-        ("8", "FALTANTE (MENOS)"),
-        ("9", "SOBRANTE (MAS)"),
-        ("", "TOTAL ENTREGADO PESOS")
-    ]
-
-    for row_idx, (value1, value2) in enumerate(values, start=21):
-        ws.cell(row=row_idx, column=1, value=value1)
-        ws.cell(row=row_idx, column=2, value=value2)
-        if row_idx in (21, 27, 29, 32):
-            for col_idx in range(1, 6):  # Columns 1 and 2
-                ws.cell(row=row_idx, column=col_idx).font = Font(bold=True)
-                ws.cell(row=row_idx, column=col_idx).fill = fill_date
