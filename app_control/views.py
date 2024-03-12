@@ -456,23 +456,23 @@ def daily_report_export(request):
     ws.column_dimensions[get_column_letter(2)].width = 27
 
     terminals_report_data = (
-            Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
-            .all()
-            .filter(created_at__date=datetime.now().date() - timedelta(days=2))
-            .filter(payment_methods__name="creditCard")
-            .values_list("payment_terminal__name", "created_by__fullname")
-            .annotate(
-                quantity=Count("id"),
-                total=Sum("payment_methods__paid_amount")
-            )
+        Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
+        .all()
+        # .filter(created_at__date=datetime.now().date())
+        .filter(payment_methods__name="creditCard")
+        .values_list("payment_terminal__name", "created_by__fullname")
+        .annotate(
+            quantity=Count("id"),
+            total=Sum("payment_methods__paid_amount")
         )
+    )
 
     last_row = create_terminals_report(ws, terminals_report_data)
 
     dollar_report_data = (
         Invoice.objects.select_related("InvoiceItems", "created_by")
         .all()
-        .filter(created_at__date=datetime.now().date())
+        # .filter(created_at__date=datetime.now().date())
         .filter(is_dolar=True)
         .values_list("created_by__fullname")
         .annotate(
@@ -480,11 +480,34 @@ def daily_report_export(request):
         )
     )
 
-    print(dollar_report_data)
+    last_row = create_dollars_report(ws, dollar_report_data, last_row)
 
-    create_dollars_report(ws, dollar_report_data, last_row)
-    create_cash_report(ws)
+    cash_report_data = (
+        Invoice.objects.select_related("InvoiceItems", "created_by")
+        .all()
+        # .filter(created_at__date=datetime.now().date())
+        .values_list("created_by__fullname")
+        .annotate(
+            quantity=Sum("invoice_items__amount")
+        )
+    )
 
+    dollar_report_data_in_pesos = (
+        Invoice.objects.select_related("InvoiceItems", "created_by")
+        .all()
+        # .filter(created_at__date=datetime.now().date())
+        .filter(is_dolar=True)
+        .values_list("created_by__fullname")
+        .annotate(
+            quantity=Sum("invoice_items__amount")
+        )
+    )
+
+
+
+    print(cash_report_data)
+
+    create_cash_report(ws, last_row, cash_report_data)
 
     wb.save(response)
     return response
