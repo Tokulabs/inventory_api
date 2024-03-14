@@ -22,7 +22,7 @@ class InventoryGroupSerializer(serializers.ModelSerializer):
         return None
 
 
-class ProviderSerializer(serializers.Serializer):
+class ProviderSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
 
@@ -37,7 +37,7 @@ class InventorySerializer(serializers.ModelSerializer):
     group = InventoryGroupSerializer(read_only=True)
     group_id = serializers.CharField(write_only=True)
     provider = ProviderSerializer(read_only=True)
-    provider_id = serializers.CharField(write_only=True, required=False)
+    provider_id = serializers.CharField(write_only=True)
 
     class Meta:
         model = Inventory

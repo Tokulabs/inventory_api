@@ -2,7 +2,7 @@ from django.urls import path, include
 from .views import (
     DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView, SaleByShopView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
-    PaymentTerminalView, daily_report_export
+    PaymentTerminalView, daily_report_export, ProviderView
 )
 
 from rest_framework.routers import DefaultRouter
@@ -10,6 +10,7 @@ from rest_framework.routers import DefaultRouter
 router = DefaultRouter(trailing_slash=False)
 
 router.register('inventory', InventoryView, "inventory")
+router.register('provider', ProviderView, "provider")
 router.register('inventory-csv', InventoryCSVLoaderView, "inventory-csv")
 router.register('shop', ShopView, "shop")
 router.register('summary', SummaryView, "summary")
@@ -25,6 +26,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path('update-invoice/<str:invoice_number>/',
          UpdateInvoiceView.as_view(), name='update-invoice'),
+    path('provider/<int:pk>', ProviderView.as_view({'put': 'update', 'delete': 'destroy'}), name='provider-detail'),
     path('inventory/<int:pk>/', InventoryView.as_view({'put': 'update', 'delete': 'destroy'}), name='inventory-detail'),
     path('payment-terminal/<int:pk>/', PaymentTerminalView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='payment-terminal-detail'),

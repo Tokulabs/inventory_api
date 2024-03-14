@@ -6,12 +6,13 @@ from openpyxl.utils import get_column_letter
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution, PaymentTerminal
+from app_control.models import DianResolution, PaymentTerminal, Provider
+from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    ShopWithAmountSerializer, InvoiceItem, DianSerializer, PaymentTerminalSerializer
+    ShopWithAmountSerializer, InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -71,6 +72,46 @@ class InventoryView(ModelViewSet):
         inventory.delete()
         return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
 
+
+class ProviderView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
+    queryset = Provider.objects.select_related("created_by")
+    serializer_class = ProviderSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
+        results = self.queryset.filter(**data)
+
+        if keyword:
+            search_fields = (
+                "nit", "created_by__fullname", "created_by__email",
+                "name"
+            )
+            query = get_query(keyword, search_fields)
+            return results.filter(query)
+
+        return results
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk):
+        provider = Provider.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(provider, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk):
+        provider = Provider.objects.filter(pk=pk).first()
+        provider.delete()
+        return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
 
 class InventoryGroupView(ModelViewSet):
     queryset = InventoryGroup.objects.select_related(
@@ -453,7 +494,7 @@ def daily_report_export(request):
     wb = Workbook()
     ws = wb.active
     ws.title = "REPORTE DIARIO"
-    ws.column_dimensions[get_column_letter(2)].width = 27
+    ws.column_dimensions[get_column_letter(2)].width = 29
 
     terminals_report_data = (
         Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
@@ -467,7 +508,7 @@ def daily_report_export(request):
         )
     )
 
-    last_row = create_terminals_report(ws, terminals_report_data)
+    last_row_cards = create_terminals_report(ws, terminals_report_data)
 
     dollar_report_data = (
         Invoice.objects.select_related("InvoiceItems", "created_by")
@@ -480,7 +521,7 @@ def daily_report_export(request):
         )
     )
 
-    last_row = create_dollars_report(ws, dollar_report_data, last_row)
+    last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards)
 
     cash_report_data = (
         Invoice.objects.select_related("InvoiceItems", "created_by")
@@ -503,11 +544,26 @@ def daily_report_export(request):
         )
     )
 
-
+    cards_report_data = (
+        Invoice.objects.select_related("PaymentMethods", "created_by")
+        .all()
+        # .filter(created_at__date=datetime.now().date())
+        .filter(payment_methods__name="creditCard")
+        .values_list("created_by__fullname")
+        .annotate(
+            total=Sum("payment_methods__paid_amount")
+        )
+    )
 
     print(cash_report_data)
+    print(dollar_report_data_in_pesos)
+    print(cards_report_data)
 
-    create_cash_report(ws, last_row, cash_report_data)
+    last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
+                                               cash_report_data, dollar_report_data_in_pesos, cards_report_data)
+
+    # center all text in the cells from A1 to the last cell
+    apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
 
     wb.save(response)
     return response
