@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import (
-    DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView, SaleByShopView,
+    DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, daily_report_export, ProviderView, SalesByUsersView
 )
