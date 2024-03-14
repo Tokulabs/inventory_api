@@ -499,7 +499,7 @@ def daily_report_export(request):
     terminals_report_data = (
         Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
         .all()
-        # .filter(created_at__date=datetime.now().date())
+        .filter(created_at__date=datetime.now().date())
         .filter(payment_methods__name="creditCard")
         .values_list("payment_terminal__name", "created_by__fullname")
         .annotate(
@@ -508,12 +508,14 @@ def daily_report_export(request):
         )
     )
 
+    print(terminals_report_data)
+
     last_row_cards = create_terminals_report(ws, terminals_report_data)
 
     dollar_report_data = (
         Invoice.objects.select_related("InvoiceItems", "created_by")
         .all()
-        # .filter(created_at__date=datetime.now().date())
+        .filter(created_at__date=datetime.now().date())
         .filter(is_dolar=True)
         .values_list("created_by__fullname")
         .annotate(
@@ -526,7 +528,7 @@ def daily_report_export(request):
     cash_report_data = (
         Invoice.objects.select_related("InvoiceItems", "created_by")
         .all()
-        # .filter(created_at__date=datetime.now().date())
+        .filter(created_at__date=datetime.now().date())
         .values_list("created_by__fullname")
         .annotate(
             quantity=Sum("invoice_items__amount")
@@ -536,7 +538,7 @@ def daily_report_export(request):
     dollar_report_data_in_pesos = (
         Invoice.objects.select_related("InvoiceItems", "created_by")
         .all()
-        # .filter(created_at__date=datetime.now().date())
+        .filter(created_at__date=datetime.now().date())
         .filter(is_dolar=True)
         .values_list("created_by__fullname")
         .annotate(
@@ -547,17 +549,13 @@ def daily_report_export(request):
     cards_report_data = (
         Invoice.objects.select_related("PaymentMethods", "created_by")
         .all()
-        # .filter(created_at__date=datetime.now().date())
+        .filter(created_at__date=datetime.now().date())
         .filter(payment_methods__name="creditCard")
         .values_list("created_by__fullname")
         .annotate(
             total=Sum("payment_methods__paid_amount")
         )
     )
-
-    print(cash_report_data)
-    print(dollar_report_data_in_pesos)
-    print(cards_report_data)
 
     last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
                                                cash_report_data, dollar_report_data_in_pesos, cards_report_data)
