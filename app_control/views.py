@@ -210,13 +210,17 @@ class InvoiceView(ModelViewSet):
         return results
 
     def create(self, request, *args, **kwargs):
-        request.data.update({"created_by_id": request.user.id})
-        dian_resolution = DianResolution.objects.first()
-        new_current_number = dian_resolution.current_number + 1
-        dian_resolution.current_number = new_current_number
-        dian_resolution.save()
-
-        return super().create(request, *args, **kwargs)
+        try:
+            request.data.update({"created_by_id": request.user.id})
+            dian_resolution = DianResolution.objects.first()
+            new_current_number = dian_resolution.current_number + 1
+            dian_resolution.current_number = new_current_number
+            dian_resolution.save()
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            dian_resolution.current_number -= 1
+            dian_resolution.save()
+            raise e
 
 
 class UpdateInvoiceView(APIView):
