@@ -120,38 +120,25 @@ def create_terminals_report(ws, report_data):
 
     # add dynamic values based in the report data
     updated_rows = []
-    created_rows = []
+    created_rows = 0
     terminals_drawn = {}
     for row_idx, item in enumerate(report_data, start=3):
         if item[0] not in terminals_drawn.keys():
             ws.cell(row=row_idx, column=1, value=item[2])
             ws.cell(row=row_idx, column=2, value=item[0].upper())
             ws.cell(row=row_idx, column=second_row_text.index(item[1].upper()) + 1, value=item[3])
-            created_rows.append(row_idx)
+            created_rows += 1
         else:
-            ws.cell(row=terminals_drawn.get(item[0]), column=1, value=report_data[row_idx - 4][2] + item[2])
-            ws.cell(row=terminals_drawn.get(item[0]), column=2, value=item[0].upper())
-            ws.cell(row=terminals_drawn.get(item[0]), column=second_row_text.index(item[1].upper()) + 1, value=item[3])
-            ws.cell(row=terminals_drawn.get(item[0]), column=second_row_text.index("TOTAL DIA") + 1, value="function")
+            ws.cell(row=terminals_drawn[item[0]], column=second_row_text.index(item[1].upper()) + 1, value=item[3])
             updated_rows.append(row_idx)
         terminals_drawn[item[0]] = row_idx
 
-    # compute new rows to write to
-    new_created_rows = []
-    if updated_rows:
-        for row in created_rows:
-            for to_delete_column in updated_rows:
-                if row > to_delete_column:
-                    new_created_rows.append(row - 1)
-                else:
-                    new_created_rows.append(row)
-    else:
-        new_created_rows = created_rows
-
     # delete rows that were updated
+    updated_rows.sort(reverse=True)
     for row_idx in updated_rows:
         ws.delete_rows(row_idx)
 
+    new_created_rows = list(range(3, 3 + created_rows))
     # add values to total column
     total_formulas_total_column = []
     for row in new_created_rows:
