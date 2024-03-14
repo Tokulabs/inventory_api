@@ -1,4 +1,6 @@
-from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, PaymentTerminal
+from .models import (Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution,
+                     PaymentTerminal, Provider)
+from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, Provider, PaymentTerminal
 from user_control.serializers import CustomUserSerializer
 from rest_framework import serializers
 
@@ -20,11 +22,22 @@ class InventoryGroupSerializer(serializers.ModelSerializer):
         return None
 
 
+class ProviderSerializer(serializers.ModelSerializer):
+    created_by = CustomUserSerializer(read_only=True)
+    created_by_id = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = Provider
+        fields = "__all__"
+
+
 class InventorySerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     group = InventoryGroupSerializer(read_only=True)
     group_id = serializers.CharField(write_only=True)
+    provider = ProviderSerializer(read_only=True)
+    provider_id = serializers.CharField(write_only=True)
 
     class Meta:
         model = Inventory
