@@ -70,7 +70,7 @@ class Provider(models.Model):
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
-        action = f"deleted shop - '{self.name}'"
+        action = f"deleted provider - '{self.name}'"
         super().delete(*args, **kwargs)
         add_user_activity(created_by, action=action)
 
@@ -85,11 +85,11 @@ class Inventory(models.Model):
     )
     code = models.CharField(max_length=10, unique=True, null=True)
     photo = models.TextField(blank=True, null=True)
+    provider = models.ForeignKey(
+        Provider, related_name="providers", null=True, on_delete=models.SET_NULL
+    )
     group = models.ForeignKey(
         InventoryGroup, related_name="inventories", null=True, on_delete=models.SET_NULL
-    )
-    provider = models.ForeignKey(
-        Provider, related_name="inventory_items", null=True, on_delete=models.SET_NULL
     )
     name = models.CharField(max_length=255)
     total_in_shops = models.PositiveIntegerField(default=0)
