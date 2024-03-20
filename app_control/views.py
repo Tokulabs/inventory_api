@@ -12,7 +12,7 @@ from inventory_api.excel_manager import apply_styles_to_cells
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer
+    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
