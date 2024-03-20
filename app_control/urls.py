@@ -26,7 +26,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path('update-invoice/<str:invoice_number>/',
          UpdateInvoiceView.as_view(), name='update-invoice'),
-    path('provider/<int:pk>', ProviderView.as_view({'put': 'update', 'delete': 'destroy'}), name='provider-detail'),
+    path('provider/<int:pk>/', ProviderView.as_view({'put': 'update', 'delete': 'destroy'}), name='provider-detail'),
     path('inventory/<int:pk>/', InventoryView.as_view({'put': 'update', 'delete': 'destroy'}), name='inventory-detail'),
     path('payment-terminal/<int:pk>/', PaymentTerminalView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='payment-terminal-detail'),

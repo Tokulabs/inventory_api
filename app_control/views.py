@@ -84,17 +84,22 @@ class ProviderView(ModelViewSet):
         data = self.request.query_params.dict()
         data.pop("page", None)
         keyword = data.pop("keyword", None)
+        page = data.pop("page", None)
         results = self.queryset.filter(**data)
 
-        if keyword:
-            search_fields = (
-                "nit", "created_by__fullname", "created_by__email",
-                "name"
-            )
-            query = get_query(keyword, search_fields)
-            return results.filter(query)
+        if page is not None:
+            keyword = data.pop("keyword", None)
 
-        return results
+            if keyword:
+                search_fields = (
+                    "nit", "created_by__fullname", "created_by__email", "name"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+
+            return results.order_by('id')
+
+        return self.queryset.order_by('id')
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
