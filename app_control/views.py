@@ -1,22 +1,31 @@
+from datetime import datetime, timedelta
+
+from openpyxl.styles import Font, Alignment
+from openpyxl.styles.fills import PatternFill
+from openpyxl.utils import get_column_letter
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution, PaymentTerminal
+from app_control.models import DianResolution, PaymentTerminal, Provider
+from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    ShopWithAmountSerializer, InvoiceItem, DianSerializer, PaymentTerminalSerializer
+    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
-from inventory_api.utils import CustomPagination, get_query
+from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
+    create_cash_report
 from django.db.models import Count, Sum, F, Q
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
 import csv
 import codecs
+from django.http import HttpResponse
+from openpyxl import Workbook
 
 
 class InventoryView(ModelViewSet):
@@ -63,6 +72,51 @@ class InventoryView(ModelViewSet):
         inventory.delete()
         return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
 
+
+class ProviderView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
+    queryset = Provider.objects.select_related("created_by")
+    serializer_class = ProviderSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
+        page = data.pop("page", None)
+        results = self.queryset.filter(**data)
+
+        if page is not None:
+            keyword = data.pop("keyword", None)
+
+            if keyword:
+                search_fields = (
+                    "nit", "created_by__fullname", "created_by__email", "name"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+
+            return results.order_by('id')
+
+        return self.queryset.order_by('id')
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk):
+        provider = Provider.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(provider, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk):
+        provider = Provider.objects.filter(pk=pk).first()
+        provider.delete()
+        return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
 
 class InventoryGroupView(ModelViewSet):
     queryset = InventoryGroup.objects.select_related(
@@ -161,7 +215,7 @@ class PaymentTerminalView(ModelViewSet):
                 query = get_query(keyword, search_fields)
                 results = results.filter(query)
 
-            return results
+            return results.order_by('id')
 
         return self.queryset.order_by('id')
 
@@ -185,7 +239,7 @@ class PaymentTerminalView(ModelViewSet):
 
 class InvoiceView(ModelViewSet):
     queryset = Invoice.objects.select_related(
-        "created_by", "shop", "sale_by", "payment_terminal").prefetch_related("invoice_items")
+        "created_by", "sale_by", "payment_terminal").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
@@ -202,7 +256,7 @@ class InvoiceView(ModelViewSet):
 
         if keyword:
             search_fields = (
-                "created_by__fullname", "created_by__email", "shop__name"
+                "created_by__fullname", "created_by__email",
             )
             query = get_query(keyword, search_fields)
             results = results.filter(query)
@@ -210,13 +264,17 @@ class InvoiceView(ModelViewSet):
         return results
 
     def create(self, request, *args, **kwargs):
-        request.data.update({"created_by_id": request.user.id})
-        dian_resolution = DianResolution.objects.first()
-        new_current_number = dian_resolution.current_number + 1
-        dian_resolution.current_number = new_current_number
-        dian_resolution.save()
-
-        return super().create(request, *args, **kwargs)
+        try:
+            request.data.update({"created_by_id": request.user.id})
+            dian_resolution = DianResolution.objects.first()
+            new_current_number = dian_resolution.current_number + 1
+            dian_resolution.current_number = new_current_number
+            dian_resolution.save()
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            dian_resolution.current_number -= 1
+            dian_resolution.save()
+            raise e
 
 
 class UpdateInvoiceView(APIView):
@@ -292,18 +350,16 @@ class SalePerformance(ModelViewSet):
 
         response_data = InventoryWithSumSerializer(items, many=True).data
         return Response(response_data)
-
-
-class SaleByShopView(ModelViewSet):
+    
+class SalesByUsersView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
-    queryset = InventoryView.queryset
+    queryset = CustomUser.objects.filter(is_superuser=False)
 
     def list(self, request, *args, **kwargs):
         query_data = request.query_params.dict()
         total = query_data.get('total', None)
-        monthly = query_data.get('monthly', None)
-        query = ShopView.queryset
+        query = self.queryset
 
         if not total:
             start_date = query_data.get("start_date", None)
@@ -311,23 +367,16 @@ class SaleByShopView(ModelViewSet):
 
             if start_date:
                 query = query.filter(
-                    sale_shop__create_at__range=[start_date, end_date]
+                    invoices__created_at__range=[
+                        start_date, end_date]
                 )
+        users = query.filter(invoices__is_override=False).annotate(
+            sum_of_item=Coalesce(
+                Sum("invoices__invoice_items__quantity"), 0
+            )
+        ).order_by('-sum_of_item')[0:10]
 
-        if monthly:
-            shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(month=TruncMonth(
-                'created_at')).values('month', 'name').annotate(amount_total=Sum(
-                F("sale_shop__invoice_items__quantity") *
-                F("sale_shop__invoice_items__amount")
-            ))
-
-        else:
-            shops = query.filter(sale_shop__invoice_items__invoice__is_override=False).annotate(amount_total=Sum(
-                F("sale_shop__invoice_items__quantity") *
-                F("sale_shop__invoice_items__amount")
-            )).order_by("-amount_total")
-
-        response_data = ShopWithAmountSerializer(shops, many=True).data
+        response_data = UserWithAmounSerializer(users, many=True).data
         return Response(response_data)
 
 
@@ -355,7 +404,7 @@ class PurchaseView(ModelViewSet):
             amount_total=Sum(F('amount') * F('quantity')),
             total=Sum('quantity'),
             amount_total_usd=Sum(F('usd_amount') * F('quantity'),
-                                 filter=Q(invoice__is_dolar=True, invoice__is_override=False))
+                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
         selling_price = results.get("amount_total", 0.0)
@@ -436,3 +485,83 @@ class DianResolutionView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+
+
+def daily_report_export(request):
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="reporte_diario.xlsx"'
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "REPORTE DIARIO"
+    ws.column_dimensions[get_column_letter(2)].width = 29
+
+    terminals_report_data = (
+        Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
+        .all()
+        .filter(created_at__date=datetime.now().date())
+        .filter(payment_methods__name="creditCard")
+        .values_list("payment_terminal__name", "created_by__fullname")
+        .annotate(
+            quantity=Count("id"),
+            total=Sum("payment_methods__paid_amount")
+        )
+    )
+
+    print(terminals_report_data)
+
+    last_row_cards = create_terminals_report(ws, terminals_report_data)
+
+    dollar_report_data = (
+        Invoice.objects.select_related("InvoiceItems", "created_by")
+        .all()
+        .filter(created_at__date=datetime.now().date())
+        .filter(is_dolar=True)
+        .values_list("created_by__fullname")
+        .annotate(
+            quantity=Sum("invoice_items__usd_amount")
+        )
+    )
+
+    last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards)
+
+    cash_report_data = (
+        Invoice.objects.select_related("InvoiceItems", "created_by")
+        .all()
+        .filter(created_at__date=datetime.now().date())
+        .values_list("created_by__fullname")
+        .annotate(
+            quantity=Sum("invoice_items__amount")
+        )
+    )
+
+    dollar_report_data_in_pesos = (
+        Invoice.objects.select_related("InvoiceItems", "created_by")
+        .all()
+        .filter(created_at__date=datetime.now().date())
+        .filter(is_dolar=True)
+        .values_list("created_by__fullname")
+        .annotate(
+            quantity=Sum("invoice_items__amount")
+        )
+    )
+
+    cards_report_data = (
+        Invoice.objects.select_related("PaymentMethods", "created_by")
+        .all()
+        .filter(created_at__date=datetime.now().date())
+        .filter(payment_methods__name="creditCard")
+        .values_list("created_by__fullname")
+        .annotate(
+            total=Sum("payment_methods__paid_amount")
+        )
+    )
+
+    last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
+                                               cash_report_data, dollar_report_data_in_pesos, cards_report_data)
+
+    # center all text in the cells from A1 to the last cell
+    apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
+
+    wb.save(response)
+    return response

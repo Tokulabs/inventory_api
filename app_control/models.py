@@ -43,6 +43,41 @@ class InventoryGroup(models.Model):
         return self.name
 
 
+class Provider(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="providers",
+        on_delete=models.SET_NULL
+    )
+    name = models.CharField(max_length=50, unique=True)
+    legal_name = models.CharField(max_length=100, null=True)
+    nit = models.CharField(max_length=20, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.old_name = self.name
+
+    def save(self, *args, **kwargs):
+        action = f"added new provider - '{self.name}'"
+        if self.pk is not None:
+            action = f"updated provider from - '{self.old_name}' to '{self.name}'"
+        super().save(*args, **kwargs)
+        add_user_activity(self.created_by, action=action)
+
+    def delete(self, *args, **kwargs):
+        created_by = self.created_by
+        action = f"deleted provider - '{self.name}'"
+        super().delete(*args, **kwargs)
+        add_user_activity(created_by, action=action)
+
+    def __str__(self):
+        return self.name
+
+
 class Inventory(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="inventory_items",
@@ -50,6 +85,9 @@ class Inventory(models.Model):
     )
     code = models.CharField(max_length=10, unique=True, null=True)
     photo = models.TextField(blank=True, null=True)
+    provider = models.ForeignKey(
+        Provider, related_name="providers", null=True, on_delete=models.SET_NULL
+    )
     group = models.ForeignKey(
         InventoryGroup, related_name="inventories", null=True, on_delete=models.SET_NULL
     )
@@ -154,11 +192,9 @@ class Invoice(models.Model):
         CustomUser, null=True, related_name="invoices",
         on_delete=models.SET_NULL
     )
-    shop = models.ForeignKey(
-        Shop, related_name="sale_shop", null=True, on_delete=models.SET_NULL)
     payment_terminal = models.ForeignKey(
         PaymentTerminal, related_name="payment_terminal", null=True, on_delete=models.SET_NULL)
-    is_dolar = models.BooleanField(default=False)
+    is_dollar = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     customer_name = models.CharField(max_length=255, null=True)
     customer_id = models.CharField(max_length=255, null=True)
