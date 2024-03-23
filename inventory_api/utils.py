@@ -98,6 +98,9 @@ def get_query(query_string, search_fields):
 
 
 def create_terminals_report(ws, report_data):
+    if not report_data:
+        return 3
+
     current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted(set([item[1].upper() for item in report_data]))
     second_row_text = ["CANT", "DATAFONO"] + list(users) + ["TOTAL DIA"]
@@ -180,6 +183,9 @@ def create_terminals_report(ws, report_data):
 
 
 def create_dollars_report(ws, report_data, last_row):
+    if not report_data:
+        return last_row + 1
+
     beginning_row = last_row + 1
     current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted([item[0].upper() for item in report_data])
@@ -248,6 +254,9 @@ def create_dollars_report(ws, report_data, last_row):
 
 
 def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_data, cards_report_data):
+    if not report_data:
+        return last_row + 1, last_row_cards + 1
+
     beginning_row = last_row + 1
     current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted([item[0].upper() for item in report_data])
