@@ -51,6 +51,10 @@ class Provider(models.Model):
     name = models.CharField(max_length=50, unique=True)
     legal_name = models.CharField(max_length=100, null=True)
     nit = models.CharField(max_length=20, null=True)
+    phone = models.CharField(max_length=20, null=True)
+    email = models.EmailField(null=True)
+    bank_account = models.CharField(max_length=50, null=True)
+    account_type = models.CharField(max_length=50, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
