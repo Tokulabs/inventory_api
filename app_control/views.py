@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import json
+from datetime import datetime, timedelta, date
 
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
@@ -500,81 +501,96 @@ class DianResolutionView(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
 
-def daily_report_export(request):
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="reporte_diario.xlsx"'
+class ReportExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "REPORTE DIARIO"
-    ws.column_dimensions[get_column_letter(2)].width = 29
+    def post(self, request):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="reporte_diario.xlsx"'
 
-    terminals_report_data = (
-        Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
-        .all()
-        .filter(created_at__date=datetime.now().date())
-        .filter(payment_methods__name="creditCard")
-        .values_list("payment_terminal__name", "created_by__fullname")
-        .annotate(
-            quantity=Count("id"),
-            total=Sum("payment_methods__paid_amount")
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        if not start_date or not end_date:
+            return Response({"error": "You need to provide start_date and end_date"})
+
+        # cast start_date and end_date to datetime
+        start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+
+        print("start_date", start_date)
+        print("end_date", end_date)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "REPORTE DIARIO"
+        ws.column_dimensions[get_column_letter(2)].width = 29
+
+        terminals_report_data = (
+            Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(payment_methods__name="creditCard")
+            .values_list("payment_terminal__name", "created_by__fullname")
+            .annotate(
+                quantity=Count("id"),
+                total=Sum("payment_methods__paid_amount")
+            )
         )
-    )
 
-    print(terminals_report_data)
+        last_row_cards = create_terminals_report(ws, terminals_report_data)
 
-    last_row_cards = create_terminals_report(ws, terminals_report_data)
-
-    dollar_report_data = (
-        Invoice.objects.select_related("InvoiceItems", "created_by")
-        .all()
-        .filter(created_at__date=datetime.now().date())
-        .filter(is_dolar=True)
-        .values_list("created_by__fullname")
-        .annotate(
-            quantity=Sum("invoice_items__usd_amount")
+        dollar_report_data = (
+            Invoice.objects.select_related("InvoiceItems", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_dollar=True)
+            .values_list("created_by__fullname")
+            .annotate(
+                quantity=Sum("invoice_items__usd_amount")
+            )
         )
-    )
 
-    last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards)
+        last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards)
 
-    cash_report_data = (
-        Invoice.objects.select_related("InvoiceItems", "created_by")
-        .all()
-        .filter(created_at__date=datetime.now().date())
-        .values_list("created_by__fullname")
-        .annotate(
-            quantity=Sum("invoice_items__amount")
+        cash_report_data = (
+            Invoice.objects.select_related("InvoiceItems", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .values_list("created_by__fullname")
+            .annotate(
+                quantity=Sum("invoice_items__amount")
+            )
         )
-    )
 
-    dollar_report_data_in_pesos = (
-        Invoice.objects.select_related("InvoiceItems", "created_by")
-        .all()
-        .filter(created_at__date=datetime.now().date())
-        .filter(is_dolar=True)
-        .values_list("created_by__fullname")
-        .annotate(
-            quantity=Sum("invoice_items__amount")
+        dollar_report_data_in_pesos = (
+            Invoice.objects.select_related("InvoiceItems", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_dollar=True)
+            .values_list("created_by__fullname")
+            .annotate(
+                quantity=Sum("invoice_items__amount")
+            )
         )
-    )
 
-    cards_report_data = (
-        Invoice.objects.select_related("PaymentMethods", "created_by")
-        .all()
-        .filter(created_at__date=datetime.now().date())
-        .filter(payment_methods__name="creditCard")
-        .values_list("created_by__fullname")
-        .annotate(
-            total=Sum("payment_methods__paid_amount")
+        cards_report_data = (
+            Invoice.objects.select_related("PaymentMethods", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(payment_methods__name="creditCard")
+            .values_list("created_by__fullname")
+            .annotate(
+                total=Sum("payment_methods__paid_amount")
+            )
         )
-    )
 
-    last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
-                                               cash_report_data, dollar_report_data_in_pesos, cards_report_data)
+        last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
+                                                   cash_report_data, dollar_report_data_in_pesos, cards_report_data)
 
-    # center all text in the cells from A1 to the last cell
-    apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
+        # center all text in the cells from A1 to the last cell
+        apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
 
-    wb.save(response)
-    return response
+        wb.save(response)
+        return response
