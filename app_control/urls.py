@@ -28,6 +28,7 @@ urlpatterns = [
          UpdateInvoiceView.as_view(), name='update-invoice'),
     path('provider/<int:pk>/', ProviderView.as_view({'put': 'update', 'delete': 'destroy'}), name='provider-detail'),
     path('inventory/<int:pk>/', InventoryView.as_view({'put': 'update', 'delete': 'destroy'}), name='inventory-detail'),
+    path('shop/<int:pk>/', ShopView.as_view({'put': 'update', 'delete': 'destroy'}), name='shop-detail'),
     path('payment-terminal/<int:pk>/', PaymentTerminalView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='payment-terminal-detail'),
     path('daily_report_export/', daily_report_export, name='daily_report_export')

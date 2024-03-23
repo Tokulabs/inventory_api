@@ -188,6 +188,19 @@ class ShopView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+    
+    def update(self, request, pk=None):
+        shop = Shop.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(shop, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        shop = Shop.objects.filter(pk=pk).first()
+        shop.delete()
+        return Response({"message": "Shop deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class PaymentTerminalView(ModelViewSet):
