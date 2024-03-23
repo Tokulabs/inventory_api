@@ -248,6 +248,9 @@ class InvoiceItem(models.Model):
     quantity = models.PositiveIntegerField()
     amount = models.FloatField(null=True)
     usd_amount = models.FloatField(null=True)
+    discount = models.FloatField(default=0)
+    original_amount = models.FloatField(null=True)
+    original_usd_amount = models.FloatField(null=True)
 
     def save(self, *args, **kwargs):
         if self.item.total_in_shops < self.quantity:
@@ -257,8 +260,10 @@ class InvoiceItem(models.Model):
         self.item_name = self.item.name
         self.item_code = self.item.code
 
-        self.amount = self.quantity * self.item.selling_price
-        self.usd_amount = self.quantity * self.item.usd_price
+        self.amount = self.quantity * self.item.selling_price * (1 - self.discount)
+        self.usd_amount = self.quantity * self.item.usd_price * (1 - self.discount)
+        self.original_amount = self.quantity * self.item.selling_price
+        self.original_usd_amount = self.quantity * self.item.usd_price
         self.item.total_in_shops = self.item.total_in_shops - self.quantity
         self.item.save()
 

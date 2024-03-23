@@ -76,6 +76,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 class InvoiceItemDataSerializer(serializers.Serializer):
     item_id = serializers.CharField()
     quantity = serializers.IntegerField()
+    discount = serializers.FloatField()
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
