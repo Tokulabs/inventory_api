@@ -213,6 +213,13 @@ class Invoice(models.Model):
     class Meta:
         ordering = ("-created_at",)
 
+    def save(self, *args, **kwargs):
+        action = f"added new shop - '{self.name}'"
+        if self.pk is not None:
+            action = f"updated shop from - '{self.old_name}' to '{self.name}'"
+        super().save(*args, **kwargs)
+        add_user_activity(self.created_by, action=action)
+
     def delete(self, *args, **kwargs):
         created_by = self.created_by
         action = f"deleted invoice - '{self.id}'"

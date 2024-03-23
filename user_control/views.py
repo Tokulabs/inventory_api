@@ -148,7 +148,7 @@ class UserActivitiesView(ModelViewSet):
 
 class UsersView(ModelViewSet):
     serializer_class = CustomUserSerializer
-    http_method_names = ["get", "put", "patch"]
+    http_method_names = ["get", "put", "patch", "delete"]
     permission_classes = (IsAuthenticatedCustom, )
     pagination_class = CustomPagination
 
@@ -179,3 +179,9 @@ class UsersView(ModelViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def destroy(self, request, pk=None):
+        user = CustomUser.objects.filter(pk=pk).first()
+        user.delete()
+        return Response({"message": "User deleted successfully"}, status=status.HTTP_200_OK)
+

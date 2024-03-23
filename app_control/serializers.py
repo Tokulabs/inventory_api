@@ -98,10 +98,10 @@ class InvoiceSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     payment_terminal = PaymentTerminalSerializer(read_only=True)
-    payment_terminal_id = serializers.CharField(write_only=True)
+    payment_terminal_id = serializers.CharField(read_only=True)
     invoice_items = InvoiceItemSerializer(read_only=True, many=True)
-    invoice_item_data = InvoiceItemDataSerializer(write_only=True, many=True)
-    payment_methods = PaymentMethodSerializer(many=True)
+    invoice_item_data = InvoiceItemDataSerializer(read_only=True, many=True)
+    payment_methods = PaymentMethodSerializer(read_only=True, many=True)
     sale_by = CustomUserSerializer(read_only=True)
     sale_by_id = serializers.CharField(write_only=True, required=False)
 

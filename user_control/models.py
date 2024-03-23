@@ -41,12 +41,15 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     objects = CustomUserManager()
 
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+
     def __str__(self):
         return self.email
 
     class Meta:
         ordering = ("created_at", )
-
+    
 
 class UserActivities(models.Model):
     user = models.ForeignKey(

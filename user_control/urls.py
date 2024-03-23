@@ -15,5 +15,6 @@ router.register("activities", UserActivitiesView, 'activities log')
 router.register("users", UsersView, 'users')
 
 urlpatterns = [
-    path("", include(router.urls))
+    path("", include(router.urls)),
+    path('users/<int:pk>/', UsersView.as_view({'put': 'update', 'delete': 'destroy'}), name='users-detail')
 ]

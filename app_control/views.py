@@ -119,6 +119,7 @@ class ProviderView(ModelViewSet):
         return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
 
 class InventoryGroupView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
     queryset = InventoryGroup.objects.select_related(
         "belongs_to", "created_by").prefetch_related("inventories")
     serializer_class = InventoryGroupSerializer
@@ -154,6 +155,19 @@ class InventoryGroupView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+    
+    def update(self, request, pk=None):
+        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(inventory_group, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        inventory_group.delete()
+        return Response({"message": "Inventory Group deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class ShopView(ModelViewSet):
@@ -251,6 +265,7 @@ class PaymentTerminalView(ModelViewSet):
 
 
 class InvoiceView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
     queryset = Invoice.objects.select_related(
         "created_by", "sale_by", "payment_terminal").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
@@ -288,6 +303,19 @@ class InvoiceView(ModelViewSet):
             dian_resolution.current_number -= 1
             dian_resolution.save()
             raise e
+        
+    def update(self, request, pk=None):
+        invoice = Invoice.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(invoice, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        invoice = Invoice.objects.filter(pk=pk).first()
+        invoice.delete()
+        return Response({"message": "Invoice deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class UpdateInvoiceView(APIView):
@@ -482,22 +510,47 @@ class InventoryCSVLoaderView(ModelViewSet):
 
 
 class DianResolutionView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
     queryset = DianResolution.objects.all()
     serializer_class = DianSerializer
     permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
 
     def get_queryset(self):
         if self.request.method.lower() != 'get':
             return self.queryset
 
         data = self.request.query_params.dict()
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
+
         results = self.queryset.filter(**data)
+
+        if keyword:
+            search_fields = (
+                "created_by", "document_number", "current_number"
+            )
+            query = get_query(keyword, search_fields)
+            return results.filter(query)
 
         return results
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+    
+    def update(self, request, pk=None):
+        dian_res = DianResolution.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(dian_res, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        dian_res = DianResolution.objects.filter(pk=pk).first()
+        dian_res.delete()
+        return Response({"message": "Dian Resolution deleted successfully"}, status=status.HTTP_200_OK)
 
 
 def daily_report_export(request):
