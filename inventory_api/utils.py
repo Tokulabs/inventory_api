@@ -248,7 +248,8 @@ def create_dollars_report(ws, report_data, last_row):
     # apply english accounting format to all from second_row_text[2:] from beginning_row + 2 to beginning_row + 5
     for column in second_row_text[2:]:
         for row in range(beginning_row + 2, beginning_row + 6):
-            ws[f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+            ws[
+                f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
     return beginning_row + 6
 
@@ -371,6 +372,28 @@ def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_
     # apply english accounting format to all from second_row_text[2:] from beginning_row + 2 to beginning_row + 12
     for column in second_row_text[2:]:
         for row in range(beginning_row + 2, beginning_row + 13):
-            ws[f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+            ws[
+                f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
     return beginning_row + 13, second_row_text.index("TOTAL DIA") + 1
+
+
+def create_inventory_report(ws, report_data):
+    row_titles = ["CATEGORIA", "GRUPO", "CODIGO", "NOMBRE", "CANTIDAD BODEGA", "CANTIDAD TIENDA", "COSTO UNIDAD",
+                  "VALOR VENTA UNIDAD",
+                  "COSTO TOTAL BODEGA", "COSTO TOTAL TIENDA", "TOTAL VENTA BODEGA",
+                  "TOTAL VENTA TIENDA", "UNIDAD"]
+    add_values_to_row_multiple_columns(1, 1, row_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
+    for column in range(1, 13):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+
+    for row_idx, row_data in enumerate(report_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    # apply english accounting format to all columns from 6 to 11
+    for column in range(7, 13):
+        for row in range(2, len(report_data) + 2):
+            ws[f"{get_column_letter(column)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
