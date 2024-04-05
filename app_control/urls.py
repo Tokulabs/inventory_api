@@ -35,4 +35,5 @@ urlpatterns = [
     path('inventories_report_export/', InventoriesReportExporter.as_view(), name='inventories_report_export'),
     path('dian-resolution/<int:pk>/', DianResolutionView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='dian-resolution-detail'),
+    path('group/<int:pk>/', InventoryGroupView.as_view({'put': 'update', 'delete': 'destroy'}), name='group-detail'),
 ]
