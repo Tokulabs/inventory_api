@@ -130,6 +130,7 @@ class InventoryGroupView(ModelViewSet):
     serializer_class = InventoryGroupSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
+
     def get_queryset(self):
         if self.request.method.lower() != "get":
             return self.queryset
@@ -150,6 +151,7 @@ class InventoryGroupView(ModelViewSet):
         return self.queryset.order_by('id').annotate(
             total_items=Count('inventories')
         )
+
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
@@ -660,7 +662,7 @@ class InventoriesReportExporter(APIView):
                          "total_price_in_shops", "total_price_in_storage", "total_selling_price_in_shops",
                          "total_selling_price_in_storage", "units"
                          )
-            )
+        )
 
         print(inventories_report_data)
 

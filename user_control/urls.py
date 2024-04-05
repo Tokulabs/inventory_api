@@ -15,5 +15,7 @@ router.register("activities", UserActivitiesView, 'activities log')
 router.register("users", UsersView, 'users')
 
 urlpatterns = [
-    path("", include(router.urls))
+    path("", include(router.urls)),
+    path('users/<int:pk>/', UsersView.as_view({'put': 'update'}), name='users-detail'),
+    path('users/<int:pk>/toggle-active/', UsersView.as_view({'post': 'toggle_is_active'}), name='users-toggle'),
 ]
