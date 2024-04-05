@@ -32,5 +32,7 @@ urlpatterns = [
     path('payment-terminal/<int:pk>/', PaymentTerminalView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='payment-terminal-detail'),
     path('daily_report_export/', ReportExporter.as_view(), name='daily_report_export'),
-    path('inventories_report_export/', InventoriesReportExporter.as_view(), name='inventories_report_export')
+    path('inventories_report_export/', InventoriesReportExporter.as_view(), name='inventories_report_export'),
+    path('dian-resolution/<int:pk>/', DianResolutionView.as_view({'put': 'update', 'delete': 'destroy'}),
+         name='dian-resolution-detail'),
 ]
