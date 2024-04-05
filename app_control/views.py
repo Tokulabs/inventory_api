@@ -123,41 +123,49 @@ class ProviderView(ModelViewSet):
 
 
 class InventoryGroupView(ModelViewSet):
+    http_method_names = ('get', 'put', 'delete', 'post')
+
     queryset = InventoryGroup.objects.select_related(
         "belongs_to", "created_by").prefetch_related("inventories")
     serializer_class = InventoryGroupSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
-
     def get_queryset(self):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
         page = data.pop("page", None)
-
         if page is not None:
             keyword = data.pop("keyword", None)
-
             results = self.queryset.filter(**data).order_by('id')
-
             if keyword:
                 search_fields = (
                     "created_by__fullname", "created_by__email",
                 )
                 query = get_query(keyword, search_fields)
                 results = results.filter(query)
-
             return results.order_by('id').annotate(
                 total_items=Count('inventories')
             )
-
         return self.queryset.order_by('id').annotate(
             total_items=Count('inventories')
         )
-
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk=None):
+        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(inventory_group, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        inventory_group.delete()
+        return Response({"message": "Inventory Group deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class ShopView(ModelViewSet):
