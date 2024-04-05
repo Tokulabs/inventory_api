@@ -105,6 +105,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     payment_methods = PaymentMethodSerializer(many=True)
     sale_by = CustomUserSerializer(read_only=True)
     sale_by_id = serializers.CharField(write_only=True, required=False)
+    dian_document_number = serializers.CharField(required=False)
 
     class Meta:
         model = Invoice
@@ -130,6 +131,36 @@ class InvoiceSerializer(serializers.ModelSerializer):
             invoice_item_serializer.save()
         else:
             invoice.delete()
+            raise Exception(invoice_item_serializer.errors)
+
+        for payment_method_data in payment_methods_data:
+            PaymentMethod.objects.create(
+                invoice=invoice, **payment_method_data)
+
+        return invoice
+
+    def update(self, instance, validated_data):
+        invoice_item_data = validated_data.pop("invoice_item_data")
+        payment_methods_data = validated_data.pop("payment_methods", [])
+
+        if not invoice_item_data:
+            raise Exception("You need to provide at least one Invoice item")
+
+        if not payment_methods_data:
+            raise Exception("You need to provide at least one Payment method")
+
+        invoice = super().update(instance, validated_data)
+
+        InvoiceItem.objects.filter(invoice=invoice).delete()
+        PaymentMethod.objects.filter(invoice=invoice).delete()
+
+        invoice_item_serializer = InvoiceItemSerializer(data=[
+            {"invoice_id": invoice.id, **item} for item in invoice_item_data
+        ], many=True)
+
+        if invoice_item_serializer.is_valid():
+            invoice_item_serializer.save()
+        else:
             raise Exception(invoice_item_serializer.errors)
 
         for payment_method_data in payment_methods_data:

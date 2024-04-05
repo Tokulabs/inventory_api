@@ -265,6 +265,7 @@ class PaymentTerminalView(ModelViewSet):
 
 
 class InvoiceView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
     queryset = Invoice.objects.select_related(
         "created_by", "sale_by", "payment_terminal").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
@@ -295,13 +296,29 @@ class InvoiceView(ModelViewSet):
             request.data.update({"created_by_id": request.user.id})
             dian_resolution = DianResolution.objects.first()
             new_current_number = dian_resolution.current_number + 1
+            dian_resolution_document_number = dian_resolution.document_number
             dian_resolution.current_number = new_current_number
             dian_resolution.save()
+
+            request.data.update({"dian_document_number": dian_resolution_document_number, "invoice_number": new_current_number})
             return super().create(request, *args, **kwargs)
         except Exception as e:
             dian_resolution.current_number -= 1
             dian_resolution.save()
             raise e
+
+    def update(self, request, pk=None):
+        invoice = Invoice.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(invoice, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        invoice = Invoice.objects.filter(pk=pk).first()
+        invoice.delete()
+        return Response({"message": "Invoice deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class UpdateInvoiceView(APIView):
