@@ -1,9 +1,11 @@
 import json
 from datetime import datetime, timedelta, date
 
+from django.db.models.functions.text import Upper
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
 from openpyxl.utils import get_column_letter
+
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
@@ -19,8 +21,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report
-from django.db.models import Count, Sum, F, Q
+    create_cash_report, create_inventory_report
+from django.db.models import Count, Sum, F, Q, Value, CharField
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
 import csv
@@ -119,6 +121,7 @@ class ProviderView(ModelViewSet):
         provider.delete()
         return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
 
+
 class InventoryGroupView(ModelViewSet):
     queryset = InventoryGroup.objects.select_related(
         "belongs_to", "created_by").prefetch_related("inventories")
@@ -189,7 +192,7 @@ class ShopView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
-    
+
     def update(self, request, pk=None):
         shop = Shop.objects.filter(pk=pk).first()
         serializer = self.serializer_class(shop, data=request.data)
@@ -364,7 +367,8 @@ class SalePerformance(ModelViewSet):
 
         response_data = InventoryWithSumSerializer(items, many=True).data
         return Response(response_data)
-    
+
+
 class SalesByUsersView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
@@ -519,9 +523,6 @@ class ReportExporter(APIView):
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        print("start_date", start_date)
-        print("end_date", end_date)
-
         wb = Workbook()
         ws = wb.active
         ws.title = "REPORTE DIARIO"
@@ -591,6 +592,46 @@ class ReportExporter(APIView):
 
         # center all text in the cells from A1 to the last cell
         apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
+
+        wb.save(response)
+        return response
+
+
+class InventoriesReportExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="reporte_inventarios.xlsx"'
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "REPORTE DE INVENTARIOS"
+
+        inventories_report_data = (
+            Inventory.objects.select_related("group")
+            .all()
+            .annotate(
+                upper_group_name=Upper("group__belongs_to__name"),
+                upper_group_subname=Upper("group__name"),
+                upper_name=Upper("name"),
+                total_price_in_shops=F('total_in_shops') * F('buying_price'),
+                total_price_in_storage=F('total_in_storage') * F('buying_price'),
+                total_selling_price_in_shops=F('total_in_shops') * F('selling_price'),
+                total_selling_price_in_storage=F('total_in_storage') * F('selling_price'),
+                units=Value("COP", output_field=CharField())
+            )
+            .values_list("upper_group_name", "upper_group_subname", "code", "upper_name", "total_in_storage",
+                         "total_in_shops", "buying_price", "selling_price",
+                         "total_price_in_shops", "total_price_in_storage", "total_selling_price_in_shops",
+                         "total_selling_price_in_storage", "units"
+                         )
+            )
+
+        print(inventories_report_data)
+
+        create_inventory_report(ws, inventories_report_data)
 
         wb.save(response)
         return response
