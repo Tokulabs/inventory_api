@@ -21,7 +21,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report
+    create_cash_report, create_inventory_report, create_product_sales_report
 from django.db.models import Count, Sum, F, Q, Value, CharField
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
@@ -681,9 +681,53 @@ class InventoriesReportExporter(APIView):
                          )
         )
 
-        print(inventories_report_data)
-
         create_inventory_report(ws, inventories_report_data)
+
+        wb.save(response)
+        return response
+
+
+class ItemsReportExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="reporte_ventas_x_producto.xlsx"'
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "REPORTE DE VENTAS POR PRODUCTO"
+
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        if not start_date or not end_date:
+            return Response({"error": "You need to provide start_date and end_date"})
+
+        report_data = (
+            Invoice.objects.select_related("InvoiceItems")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .values_list("invoice_items__item_code", "invoice_items__item_name")
+            .annotate(
+                quantity=Sum("invoice_items__quantity"),
+            )
+        )
+
+        report_data_nulled = (
+            Invoice.objects.select_related("InvoiceItems")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=True)
+            .values_list("invoice_items__item_code", "invoice_items__item_name")
+            .annotate(
+                quantity=Sum("invoice_items__quantity"),
+            )
+        )
+
+        create_product_sales_report(ws, report_data, report_data_nulled, start_date, end_date)
 
         wb.save(response)
         return response
