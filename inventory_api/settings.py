@@ -88,7 +88,7 @@ WSGI_APPLICATION = 'inventory_api.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-
+'''
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -99,15 +99,13 @@ DATABASES = {
         'PORT': config('DB_PORT'),
     }
 }
-
+'''
 
 # Render PostgreSQL database (live)
 
-'''
 DATABASES = {
     'default': dj_database_url.parse(config('DB_EXTERNAL_URL'))
 }
-'''
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators

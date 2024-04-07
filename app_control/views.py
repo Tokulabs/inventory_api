@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta, date
 
+from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond
 from django.db.models.functions.text import Upper
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
@@ -21,8 +22,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report
-from django.db.models import Count, Sum, F, Q, Value, CharField
+    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report
+from django.db.models import Count, Sum, F, Q, Value, CharField, Func
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
 import csv
@@ -584,6 +585,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
             .filter(payment_methods__name="creditCard")
             .values_list("payment_terminal__name", "created_by__fullname")
             .annotate(
@@ -598,6 +600,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
             .filter(is_dollar=True)
             .values_list("created_by__fullname")
             .annotate(
@@ -610,6 +613,7 @@ class ReportExporter(APIView):
         cash_report_data = (
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
+            .filter(is_override=False)
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .values_list("created_by__fullname")
             .annotate(
@@ -621,6 +625,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
             .filter(is_dollar=True)
             .values_list("created_by__fullname")
             .annotate(
@@ -632,6 +637,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
             .filter(payment_methods__name="creditCard")
             .values_list("created_by__fullname")
             .annotate(
@@ -681,9 +687,91 @@ class InventoriesReportExporter(APIView):
                          )
         )
 
-        print(inventories_report_data)
-
         create_inventory_report(ws, inventories_report_data)
+
+        wb.save(response)
+        return response
+
+
+class ItemsReportExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="reporte_ventas_x_producto.xlsx"'
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "REPORTE DE VENTAS POR PRODUCTO"
+
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        if not start_date or not end_date:
+            return Response({"error": "You need to provide start_date and end_date"})
+
+        report_data = (
+            Invoice.objects.select_related("InvoiceItems")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .values_list("invoice_items__item_code", "invoice_items__item_name")
+            .annotate(
+                quantity=Sum("invoice_items__quantity"),
+            )
+        )
+
+        report_data_nulled = (
+            Invoice.objects.select_related("InvoiceItems")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=True)
+            .values_list("invoice_items__item_code", "invoice_items__item_name")
+            .annotate(
+                quantity=Sum("invoice_items__quantity"),
+            )
+        )
+
+        create_product_sales_report(ws, report_data, report_data_nulled, start_date, end_date)
+
+        wb.save(response)
+        return response
+
+class InvoicesReportExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="reporte_facturas.xlsx"'
+
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        if not start_date or not end_date:
+            return Response({"error": "You need to provide start_date and end_date"})
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "REPORTE DE FACTURACION"
+
+        inventories_report_data = (
+            Invoice.objects.select_related("payment_terminal", "InvoiceItems", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .annotate(
+                total_invoice=Sum("invoice_items__amount"),
+            )
+            .values_list(
+                "created_at__date", "created_by__fullname", "invoice_number", "dian_document_number",
+                "payment_terminal__name", "total_invoice",
+                "customer_id", "customer_name", "customer_email", "customer_phone",
+            )
+        )
+
+        create_invoices_report(ws, inventories_report_data)
 
         wb.save(response)
         return response

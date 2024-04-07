@@ -397,3 +397,74 @@ def create_inventory_report(ws, report_data):
     for column in range(7, 13):
         for row in range(2, len(report_data) + 2):
             ws[f"{get_column_letter(column)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+
+
+def create_product_sales_report(ws, report_data, report_data_nulled, start_date, end_date):
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+    ws['A1'] = "SIGNOS STUDIO SAS"
+
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
+    ws['A2'] = "NIT. 832004603-8"
+
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=3)
+    ws['A3'] = f"Del {start_date} al {end_date}"
+
+    ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=3)
+    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=3)
+
+    row_titles = ["Cod.", "Descripción", "Cant."]
+    add_values_to_row_multiple_columns(1, 5, row_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=5, ws=ws,
+                          font=headers_font, alignment=alignment, fill=None, border=None)
+
+    for column in range(1, 4):
+        ws.column_dimensions[get_column_letter(column)].width = 15
+
+    for row_idx, row_data in enumerate(report_data, start=7):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    # compute total for 3rd column from 7 to len(report_data) + 6
+    total_formula = sum_formula_text(7, len(report_data) + 6, 3, 3)
+    ws.cell(row=len(report_data) + 7, column=2, value="TOTAL")
+    ws.cell(row=len(report_data) + 7, column=3, value=total_formula)
+
+    apply_styles_to_cells(start_column=1, start_row=len(report_data) + 7, end_column=3, end_row=len(report_data) + 7,
+                          ws=ws,
+                          font=headers_font, alignment=None, fill=None, border=None)
+
+    if report_data_nulled:
+        ws.cell(row=len(report_data) + 8, column=1, value="Anulados")
+        for row_idx, row_data in enumerate(report_data_nulled, start=len(report_data) + 9):
+            for col_idx, cell_value in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=cell_value)
+        # compute total for 3rd column from len(report_data) + 9 to len(report_data) + 8 + len(report_data_nulled)
+        total_formula = sum_formula_text(len(report_data) + 9, len(report_data) + 8 + len(report_data_nulled), 3, 3)
+        ws.cell(row=len(report_data) + 9 + len(report_data_nulled), column=2, value="TOTAL")
+        ws.cell(row=len(report_data) + 9 + len(report_data_nulled), column=3, value=total_formula)
+
+    apply_styles_to_cells(start_column=1, start_row=len(report_data) + 8, end_column=3, end_row=len(report_data) + 8,
+                          ws=ws,
+                          font=headers_font, alignment=None, fill=None, border=None)
+    apply_styles_to_cells(start_column=1, start_row=len(report_data) + 9 + len(report_data_nulled),
+                          end_column=3, end_row=len(report_data) + 9 + len(report_data_nulled),
+                          ws=ws,
+                          font=headers_font, alignment=None, fill=None, border=None)
+
+
+def create_invoices_report(ws, report_data):
+    row_titles = ["FECHA", "VENDEDOR", "NUMERO DE FACTURA", "DOCUMENTO DIAN", "DATAFONO", "TOTAL", "ID CLIENTE",
+                  "NOMBRE CLIENTE", "EMAIL CLIENTE", "TELEFONO CLIENTE"]
+    add_values_to_row_multiple_columns(1, 1, row_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
+    for column in range(1, 13):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+
+    for row_idx, row_data in enumerate(report_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    # apply english accounting format to all columns from 6 to 11
+    for row in range(2, len(report_data) + 2):
+        ws[f"{get_column_letter(6)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'

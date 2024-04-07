@@ -2,7 +2,8 @@ from django.urls import path, include
 from .views import (
     DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
-    PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter
+    PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
+    InvoicesReportExporter
 )
 
 from rest_framework.routers import DefaultRouter
@@ -37,4 +38,6 @@ urlpatterns = [
          name='dian-resolution-detail'),
     path('group/<int:pk>/', InventoryGroupView.as_view({'put': 'update', 'delete': 'destroy'}), name='group-detail'),
     path('invoice/<int:pk>/', InvoiceView.as_view({'put': 'update', 'delete': 'destroy'}), name='invoice-detail'),
+    path('product_sales_report_export/', ItemsReportExporter.as_view(), name='product_sales_report_export'),
+    path('invoices_report_export/', InvoicesReportExporter.as_view(), name='invoices_report_export'),
 ]
