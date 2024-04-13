@@ -280,17 +280,21 @@ class InvoiceView(ModelViewSet):
             return self.queryset
 
         data = self.request.query_params.dict()
-        data.pop("page", None)
+        page = data.pop("page", None)
         keyword = data.pop("keyword", None)
 
         results = self.queryset.filter(**data)
 
-        if keyword:
-            search_fields = (
-                "created_by__fullname", "created_by__email",
-            )
-            query = get_query(keyword, search_fields)
-            results = results.filter(query)
+        if page is not None:
+            keyword = data.pop("keyword", None)
+            
+            if keyword:
+                search_fields = (
+                    "created_by__fullname", "created_by__email"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+                return results.filter(query)
 
         return results
 
