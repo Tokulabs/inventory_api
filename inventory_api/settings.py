@@ -103,11 +103,9 @@ DATABASES = {
 
 # Render PostgreSQL database (live)
 
-
 DATABASES = {
     'default': dj_database_url.parse(config('DB_EXTERNAL_URL'))
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
