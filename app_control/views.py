@@ -125,7 +125,7 @@ class ProviderView(ModelViewSet):
 
 
 class CustomerView(ModelViewSet):
-    http_method_names = ('get', 'post')
+    http_method_names = ('get', 'post', 'put', 'delete')
     queryset = Customer.objects.select_related(
         "created_by")
     serializer_class = CustomerSerializer
@@ -153,6 +153,12 @@ class CustomerView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         return super().create(request, *args, **kwargs)
+
+    def destroy(self, request, pk):
+        customer = Customer.objects.filter(pk=pk).first()
+        customer.delete()
+        return Response({"message": "Customer deleted successfully"}, status=status.HTTP_200_OK)
+
 
 class InventoryGroupView(ModelViewSet):
     http_method_names = ('get', 'put', 'delete', 'post')
