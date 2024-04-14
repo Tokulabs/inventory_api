@@ -3,7 +3,7 @@ from .views import (
     DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
-    InvoicesReportExporter
+    InvoicesReportExporter, CustomerView
 )
 
 from rest_framework.routers import DefaultRouter
@@ -22,6 +22,7 @@ router.register('invoice', InvoiceView, "invoice")
 router.register('dian-resolution', DianResolutionView, "dian-resolution")
 router.register('payment-terminal', PaymentTerminalView, "payment-terminal")
 router.register('sales-by-user', SalesByUsersView, "sales-by-user")
+router.register('customer', CustomerView, "customer")
 
 urlpatterns = [
     path("", include(router.urls)),

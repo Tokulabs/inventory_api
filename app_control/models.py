@@ -162,6 +162,42 @@ class Shop(models.Model):
         return self.name
 
 
+class Customer(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="customers",
+        on_delete=models.SET_NULL
+    )
+    document_id = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=50, unique=True)
+    phone = models.CharField(max_length=20, null=True)
+    email = models.EmailField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.old_name = self.name
+
+    def save(self, *args, **kwargs):
+        action = f"added new customer - '{self.name}'"
+        if self.pk is not None:
+            action = f"updated customer from - '{self.old_name}' to '{self.name}'"
+        super().save(*args, **kwargs)
+        add_user_activity(self.created_by, action=action)
+
+    def delete(self, *args, **kwargs):
+        created_by = self.created_by
+        action = f"deleted customer - '{self.name}'"
+        super().delete(*args, **kwargs)
+        add_user_activity(created_by, action=action)
+
+    def __str__(self):
+        return self.name
+
+
 class PaymentTerminal(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="payment_terminals",
@@ -198,12 +234,10 @@ class Invoice(models.Model):
     )
     payment_terminal = models.ForeignKey(
         PaymentTerminal, related_name="payment_terminal", null=True, on_delete=models.SET_NULL)
+    customer = models.ForeignKey(
+        Customer, related_name="customer", null=True, on_delete=models.SET_NULL)
     is_dollar = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    customer_name = models.CharField(max_length=255, null=True)
-    customer_id = models.CharField(max_length=255, null=True)
-    customer_email = models.CharField(max_length=255, null=True)
-    customer_phone = models.CharField(max_length=255, null=True)
     sale_by = models.ForeignKey(
         CustomUser, related_name="sale_by", null=True, on_delete=models.SET_NULL)
     invoice_number = models.CharField(max_length=255, unique=True, null=True)
