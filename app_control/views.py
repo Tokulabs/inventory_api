@@ -10,13 +10,14 @@ from openpyxl.utils import get_column_letter
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution, PaymentTerminal, Provider
+from app_control.models import DianResolution, PaymentTerminal, Provider, Customer
 from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer
+    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer,
+    CustomerSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -121,6 +122,42 @@ class ProviderView(ModelViewSet):
         provider = Provider.objects.filter(pk=pk).first()
         provider.delete()
         return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
+
+
+class CustomerView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
+    queryset = Customer.objects.select_related(
+        "created_by")
+    serializer_class = CustomerSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        if self.request.method.lower() != "get":
+            return self.queryset
+        data = self.request.query_params.dict()
+        page = data.pop("page", None)
+        if page is not None:
+            keyword = data.pop("keyword", None)
+            results = self.queryset.filter(**data).order_by('id')
+            if keyword:
+                search_fields = (
+                    "created_by__fullname", "created_by__email", "document_id", "name"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+            return results.order_by('id')
+
+        return self.queryset.order_by('id')
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
+
+    def destroy(self, request, pk):
+        customer = Customer.objects.filter(pk=pk).first()
+        customer.delete()
+        return Response({"message": "Customer deleted successfully"}, status=status.HTTP_200_OK)
 
 
 class InventoryGroupView(ModelViewSet):
@@ -301,7 +338,8 @@ class InvoiceView(ModelViewSet):
             dian_resolution.current_number = new_current_number
             dian_resolution.save()
 
-            request.data.update({"dian_document_number": dian_resolution_document_number, "invoice_number": new_current_number})
+            request.data.update(
+                {"dian_document_number": dian_resolution_document_number, "invoice_number": new_current_number})
             return super().create(request, *args, **kwargs)
         except Exception as e:
             dian_resolution.current_number -= 1
@@ -738,6 +776,7 @@ class ItemsReportExporter(APIView):
         wb.save(response)
         return response
 
+
 class InvoicesReportExporter(APIView):
     http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
@@ -767,7 +806,7 @@ class InvoicesReportExporter(APIView):
             .values_list(
                 "created_at__date", "created_by__fullname", "invoice_number", "dian_document_number",
                 "payment_terminal__name", "total_invoice",
-                "customer_id", "customer_name", "customer_email", "customer_phone",
+                "customer__document_id", "customer__name", "customer__email", "customer__phone",
             )
         )
 

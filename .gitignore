@@ -2,6 +2,8 @@
 ./venv/
 app_control/migrations/__pycache__/
 app_control/migrations/
+user_control/migrations/__pycache__/
+user_control/migrations/
 **/__pycache__/
 .idea
 venv
