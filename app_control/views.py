@@ -524,16 +524,22 @@ class InventoryCSVLoaderView(ModelViewSet):
 
         try:
             csv_reader = csv.reader(
-                codecs.iterdecode(data, 'utf-8'), delimiter=';')
+                codecs.iterdecode(data, 'utf-8'), delimiter=',')
+            next(csv_reader)
             for row in csv_reader:
                 if not row[0]:
                     continue
                 inventory_items.append({
-                    "group_id": row[0],
-                    "total": row[1],
-                    "name": row[2],
-                    "price": row[3],
-                    "photo": row[4],
+                    "group_id": int(row[0]),
+                    "code": str(row[1]),
+                    "name": str(row[2]),
+                    "photo": str(row[3]),
+                    "total_in_storage": int(row[4]),
+                    "total_in_shops": int(row[5]),
+                    "selling_price": float(row[6]),
+                    "buying_price": float(row[7]),
+                    "usd_price": float(row[8]),
+                    "provider_id": int(row[9]),
                     "created_by_id": request.user.id
                 })
         except csv.Error as e:
@@ -548,7 +554,7 @@ class InventoryCSVLoaderView(ModelViewSet):
         data_validation.save()
 
         return Response({
-            "success": "Inventory items added succesfully"
+            "success": "Inventory items added successfully"
         })
 
 
