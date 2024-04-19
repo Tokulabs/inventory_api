@@ -412,6 +412,26 @@ class SummaryView(ModelViewSet):
         })
 
 
+class InvoicePainterView(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def list(self, request, *args, **kwargs):
+        invoice_number = request.query_params.get("invoice_number", None)
+        if not id:
+            return Response({"error": "You need to provide invoice id"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            invoice = Invoice.objects.select_related(
+                "payment_terminal", "created_by"
+            ).filter(invoice_number=invoice_number).first()
+
+            if not invoice:
+                return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response(InvoiceSerializer(invoice).data)
+
+
+
 class SalePerformance(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
@@ -766,6 +786,7 @@ class ItemsReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .values_list("invoice_items__item_code", "invoice_items__item_name")
             .annotate(
                 quantity=Sum("invoice_items__quantity"),
@@ -783,7 +804,19 @@ class ItemsReportExporter(APIView):
             )
         )
 
-        create_product_sales_report(ws, report_data, report_data_nulled, start_date, end_date)
+        report_data_gifts = (
+            Invoice.objects.select_related("InvoiceItems")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=True)
+            .values_list("invoice_items__item_code", "invoice_items__item_name")
+            .annotate(
+                quantity=Sum("invoice_items__quantity"),
+            )
+        )
+
+        create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date)
 
         wb.save(response)
         return response

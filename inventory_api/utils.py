@@ -399,7 +399,7 @@ def create_inventory_report(ws, report_data):
             ws[f"{get_column_letter(column)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
 
-def create_product_sales_report(ws, report_data, report_data_nulled, start_date, end_date):
+def create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date):
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
     ws['A1'] = "SIGNOS STUDIO SAS"
 
@@ -420,25 +420,26 @@ def create_product_sales_report(ws, report_data, report_data_nulled, start_date,
     for column in range(1, 4):
         ws.column_dimensions[get_column_letter(column)].width = 15
 
-    for row_idx, row_data in enumerate(report_data, start=7):
-        for col_idx, cell_value in enumerate(row_data, start=1):
-            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+    if report_data:
+        for row_idx, row_data in enumerate(report_data, start=7):
+            for col_idx, cell_value in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=cell_value)
 
-    # compute total for 3rd column from 7 to len(report_data) + 6
-    total_formula = sum_formula_text(7, len(report_data) + 6, 3, 3)
-    ws.cell(row=len(report_data) + 7, column=2, value="TOTAL")
-    ws.cell(row=len(report_data) + 7, column=3, value=total_formula)
+        # compute total for 3rd column from 7 to len(report_data) + 6
+        total_formula = sum_formula_text(7, len(report_data) + 6, 3, 3)
+        ws.cell(row=len(report_data) + 7, column=2, value="TOTAL")
+        ws.cell(row=len(report_data) + 7, column=3, value=total_formula)
 
-    apply_styles_to_cells(start_column=1, start_row=len(report_data) + 7, end_column=3, end_row=len(report_data) + 7,
-                          ws=ws,
-                          font=headers_font, alignment=None, fill=None, border=None)
+        apply_styles_to_cells(start_column=1, start_row=len(report_data) + 7, end_column=3, end_row=len(report_data) + 7,
+                              ws=ws,
+                              font=headers_font, alignment=None, fill=None, border=None)
 
     if report_data_nulled:
         ws.cell(row=len(report_data) + 8, column=1, value="Anulados")
         for row_idx, row_data in enumerate(report_data_nulled, start=len(report_data) + 9):
             for col_idx, cell_value in enumerate(row_data, start=1):
                 ws.cell(row=row_idx, column=col_idx, value=cell_value)
-        # compute total for 3rd column from len(report_data) + 9 to len(report_data) + 8 + len(report_data_nulled)
+
         total_formula = sum_formula_text(len(report_data) + 9, len(report_data) + 8 + len(report_data_nulled), 3, 3)
         ws.cell(row=len(report_data) + 9 + len(report_data_nulled), column=2, value="TOTAL")
         ws.cell(row=len(report_data) + 9 + len(report_data_nulled), column=3, value=total_formula)
@@ -450,6 +451,29 @@ def create_product_sales_report(ws, report_data, report_data_nulled, start_date,
                           end_column=3, end_row=len(report_data) + 9 + len(report_data_nulled),
                           ws=ws,
                           font=headers_font, alignment=None, fill=None, border=None)
+
+    if report_data_gifts:
+        ws.cell(row=len(report_data) + 10 + len(report_data_nulled), column=1, value="Regalos")
+        for row_idx, row_data in enumerate(report_data_gifts, start=len(report_data) + 11 + len(report_data_nulled)):
+            for col_idx, cell_value in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+        total_formula = sum_formula_text(len(report_data) + 11 + len(report_data_nulled),
+                                         len(report_data) + 10 + len(report_data_nulled) + len(report_data_gifts), 3, 3)
+        ws.cell(row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts), column=2, value="TOTAL")
+        ws.cell(row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts), column=3,
+                value=total_formula)
+
+        apply_styles_to_cells(start_column=1, start_row=len(report_data) + 10 + len(report_data_nulled),
+                              end_column=3, end_row=len(report_data) + 10 + len(report_data_nulled),
+                              ws=ws,
+                              font=headers_font, alignment=None, fill=None, border=None)
+        apply_styles_to_cells(start_column=1,
+                              start_row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts),
+                              end_column=3,
+                              end_row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts),
+                              ws=ws,
+                              font=headers_font, alignment=None, fill=None, border=None)
 
 
 def create_invoices_report(ws, report_data):
