@@ -168,9 +168,10 @@ class Customer(models.Model):
         on_delete=models.SET_NULL
     )
     document_id = models.CharField(max_length=20, unique=True)
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     phone = models.CharField(max_length=20, null=True)
     email = models.EmailField(null=True)
+    address = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
