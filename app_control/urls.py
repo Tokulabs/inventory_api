@@ -3,7 +3,7 @@ from .views import (
     DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
-    InvoicesReportExporter, CustomerView
+    InvoicesReportExporter, CustomerView, InvoicePainterView
 )
 
 from rest_framework.routers import DefaultRouter
@@ -15,6 +15,7 @@ router.register('provider', ProviderView, "provider")
 router.register('inventory-csv', InventoryCSVLoaderView, "inventory-csv")
 router.register('shop', ShopView, "shop")
 router.register('summary', SummaryView, "summary")
+router.register('invoice-painter', InvoicePainterView, "invoice-painter")
 router.register('purchase-summary', PurchaseView, "purchase-summary")
 router.register('group', InventoryGroupView, "group")
 router.register('top-selling', SalePerformance, "top-selling")

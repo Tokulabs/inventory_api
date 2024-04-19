@@ -406,6 +406,26 @@ class SummaryView(ModelViewSet):
         })
 
 
+class InvoicePainterView(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def list(self, request, *args, **kwargs):
+        invoice_number = request.query_params.get("invoice_number", None)
+        if not id:
+            return Response({"error": "You need to provide invoice id"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            invoice = Invoice.objects.select_related(
+                "payment_terminal", "created_by"
+            ).filter(invoice_number=invoice_number).first()
+
+            if not invoice:
+                return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response(InvoiceSerializer(invoice).data)
+
+
+
 class SalePerformance(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
