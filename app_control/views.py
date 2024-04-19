@@ -45,18 +45,21 @@ class InventoryView(ModelViewSet):
             return self.queryset
 
         data = self.request.query_params.dict()
-        data.pop("page", None)
+        page = data.pop("page", None)
         keyword = data.pop("keyword", None)
 
         results = self.queryset.filter(**data)
 
-        if keyword:
-            search_fields = (
-                "code", "created_by__fullname", "created_by__email",
-                "group__name", "name"
-            )
-            query = get_query(keyword, search_fields)
-            return results.filter(query)
+        if page is not None:
+            keyword = data.pop("keyword", None)
+            
+            if keyword:
+                search_fields = (
+                    "group", "group_id", "provider", "provider_id"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+                return results.filter(query)
 
         return results
 
@@ -87,7 +90,6 @@ class ProviderView(ModelViewSet):
 
     def get_queryset(self):
         data = self.request.query_params.dict()
-        data.pop("page", None)
         keyword = data.pop("keyword", None)
         page = data.pop("page", None)
         results = self.queryset.filter(**data)
@@ -315,17 +317,21 @@ class InvoiceView(ModelViewSet):
             return self.queryset
 
         data = self.request.query_params.dict()
-        data.pop("page", None)
+        page = data.pop("page", None)
         keyword = data.pop("keyword", None)
 
         results = self.queryset.filter(**data)
 
-        if keyword:
-            search_fields = (
-                "created_by__fullname", "created_by__email",
-            )
-            query = get_query(keyword, search_fields)
-            results = results.filter(query)
+        if page is not None:
+            keyword = data.pop("keyword", None)
+            
+            if keyword:
+                search_fields = (
+                    "created_by__fullname", "created_by__email"
+                )
+                query = get_query(keyword, search_fields)
+                results = results.filter(query)
+                return results.filter(query)
 
         return results
 
