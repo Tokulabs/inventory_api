@@ -760,6 +760,7 @@ class ItemsReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .values_list("invoice_items__item_code", "invoice_items__item_name")
             .annotate(
                 quantity=Sum("invoice_items__quantity"),
@@ -777,7 +778,19 @@ class ItemsReportExporter(APIView):
             )
         )
 
-        create_product_sales_report(ws, report_data, report_data_nulled, start_date, end_date)
+        report_data_gifts = (
+            Invoice.objects.select_related("InvoiceItems")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=True)
+            .values_list("invoice_items__item_code", "invoice_items__item_name")
+            .annotate(
+                quantity=Sum("invoice_items__quantity"),
+            )
+        )
+
+        create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date)
 
         wb.save(response)
         return response

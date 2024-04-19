@@ -88,6 +88,9 @@ class InvoiceItemDataSerializer(serializers.Serializer):
     item_id = serializers.CharField()
     quantity = serializers.IntegerField()
     discount = serializers.FloatField()
+    amount = serializers.FloatField()
+    usd_amount = serializers.FloatField()
+    is_gift = serializers.BooleanField()
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
