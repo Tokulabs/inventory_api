@@ -45,21 +45,18 @@ class InventoryView(ModelViewSet):
             return self.queryset
 
         data = self.request.query_params.dict()
-        page = data.pop("page", None)
+        data.pop("page", None)
         keyword = data.pop("keyword", None)
 
         results = self.queryset.filter(**data)
 
-        if page is not None:
-            keyword = data.pop("keyword", None)
-            
-            if keyword:
-                search_fields = (
-                    "group", "group_id", "provider", "provider_id"
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-                return results.filter(query)
+        if keyword:
+            search_fields = (
+                "code", "created_by__fullname", "created_by__email",
+                "group__name", "name"
+            )
+            query = get_query(keyword, search_fields)
+            return results.filter(query)
 
         return results
 
@@ -91,22 +88,17 @@ class ProviderView(ModelViewSet):
     def get_queryset(self):
         data = self.request.query_params.dict()
         keyword = data.pop("keyword", None)
-        page = data.pop("page", None)
+        data.pop("page", None)
         results = self.queryset.filter(**data)
 
-        if page is not None:
-            keyword = data.pop("keyword", None)
+        if keyword:
+            search_fields = (
+                "nit", "created_by__fullname", "created_by__email", "name"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
 
-            if keyword:
-                search_fields = (
-                    "nit", "created_by__fullname", "created_by__email", "name"
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-
-            return results.order_by('id')
-
-        return self.queryset.order_by('id')
+        return results.order_by('id')
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
@@ -138,19 +130,19 @@ class CustomerView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        page = data.pop("page", None)
-        if page is not None:
-            keyword = data.pop("keyword", None)
-            results = self.queryset.filter(**data).order_by('id')
-            if keyword:
-                search_fields = (
-                    "created_by__fullname", "created_by__email", "document_id", "name"
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-            return results.order_by('id')
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
 
-        return self.queryset.order_by('id')
+        results = self.queryset.filter(**data).order_by('id')
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "document_id", "name"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+
+        return results.order_by('id')
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
@@ -175,20 +167,19 @@ class InventoryGroupView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        page = data.pop("page", None)
-        if page is not None:
-            keyword = data.pop("keyword", None)
-            results = self.queryset.filter(**data).order_by('id')
-            if keyword:
-                search_fields = (
-                    "created_by__fullname", "created_by__email",
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-            return results.order_by('id').annotate(
-                total_items=Count('inventories')
+        data.pop("page", None)
+
+        keyword = data.pop("keyword", None)
+        results = self.queryset.filter(**data).order_by('id')
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "name"
             )
-        return self.queryset.order_by('id').annotate(
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+
+        return results.annotate(
             total_items=Count('inventories')
         )
 
@@ -221,23 +212,19 @@ class ShopView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        page = data.pop("page", None)
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
 
-        if page is not None:
-            keyword = data.pop("keyword", None)
+        results = self.queryset.filter(**data)
 
-            results = self.queryset.filter(**data)
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "name"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
 
-            if keyword:
-                search_fields = (
-                    "created_by__fullname", "created_by__email", "name"
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-
-            return results
-
-        return self.queryset.order_by('id')
+        return results.order_by('id')
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
@@ -268,23 +255,19 @@ class PaymentTerminalView(ModelViewSet):
         if self.request.method.lower() != "get":
             return self.queryset
         data = self.request.query_params.dict()
-        page = data.pop("page", None)
+        data.pop("page", None)
 
-        if page is not None:
-            keyword = data.pop("keyword", None)
+        keyword = data.pop("keyword", None)
+        results = self.queryset.filter(**data)
 
-            results = self.queryset.filter(**data)
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "name", "account_code"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
 
-            if keyword:
-                search_fields = (
-                    "created_by__fullname", "created_by__email", "name"
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-
-            return results.order_by('id')
-
-        return self.queryset.order_by('id')
+        return results.order_by('id')
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
@@ -317,23 +300,20 @@ class InvoiceView(ModelViewSet):
             return self.queryset
 
         data = self.request.query_params.dict()
-        page = data.pop("page", None)
-        keyword = data.pop("keyword", None)
+        data.pop("page", None)
 
+        keyword = data.pop("keyword", None)
         results = self.queryset.filter(**data)
 
-        if page is not None:
-            keyword = data.pop("keyword", None)
-            
-            if keyword:
-                search_fields = (
-                    "created_by__fullname", "created_by__email"
-                )
-                query = get_query(keyword, search_fields)
-                results = results.filter(query)
-                return results.filter(query)
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "invoice_number", "dian_document_number"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
 
         return results
+
 
     def create(self, request, *args, **kwargs):
         try:
