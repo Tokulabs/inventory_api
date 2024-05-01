@@ -314,11 +314,14 @@ class InvoiceView(ModelViewSet):
 
         return results
 
-
     def create(self, request, *args, **kwargs):
+        dian_resolution = DianResolution.objects.first()
         try:
+            if not request.data.get("sale_by_id"):
+                request.data.update({"sale_by_id": request.user.id})
+
             request.data.update({"created_by_id": request.user.id})
-            dian_resolution = DianResolution.objects.first()
+
             new_current_number = dian_resolution.current_number + 1
             dian_resolution_document_number = dian_resolution.document_number
             dian_resolution.current_number = new_current_number
@@ -409,7 +412,6 @@ class InvoicePainterView(ModelViewSet):
                 return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
             else:
                 return Response(InvoiceSerializer(invoice).data)
-
 
 
 class SalePerformance(ModelViewSet):

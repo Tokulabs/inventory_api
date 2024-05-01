@@ -113,7 +113,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     payment_terminal = PaymentTerminalSerializer(read_only=True)
-    payment_terminal_id = serializers.CharField(write_only=True)
+    payment_terminal_id = serializers.CharField(write_only=True, required=False, allow_null=True)
     customer = CustomerSerializer(read_only=True)
     customer_id = serializers.CharField(write_only=True)
     invoice_items = InvoiceItemSerializer(read_only=True, many=True)
