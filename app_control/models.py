@@ -321,6 +321,7 @@ class DianResolution(models.Model):
     from_number = models.PositiveIntegerField()
     to_number = models.PositiveIntegerField()
     current_number = models.PositiveIntegerField(default=None)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)

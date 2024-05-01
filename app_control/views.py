@@ -315,7 +315,10 @@ class InvoiceView(ModelViewSet):
         return results
 
     def create(self, request, *args, **kwargs):
-        dian_resolution = DianResolution.objects.first()
+        dian_resolution = DianResolution.objects.filter(active=True).first()
+        if not dian_resolution:
+            raise Exception("You need to have an active dian resolution to create invoices")
+
         try:
             if not request.data.get("sale_by_id"):
                 request.data.update({"sale_by_id": request.user.id})
@@ -594,11 +597,22 @@ class DianResolutionView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+
+        if DianResolution.objects.all().filter(active=True).exists():
+            raise Exception("You can't have more than one active dian resolution, "
+                            "please deactivate the current one first")
+
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         dian_res = DianResolution.objects.filter(pk=pk).first()
         serializer = self.serializer_class(dian_res, data=request.data)
+
+        if request.data.get("active", True) is True:
+            if DianResolution.objects.all().filter(active=True).exists():
+                raise Exception("You can't have more than one active dian resolution, "
+                                "please deactivate the current one first")
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
