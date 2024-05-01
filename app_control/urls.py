@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import (
-    DianResolutionView, InventoryView, ShopView, SummaryView, InvoiceView, PurchaseView,
+    DianResolutionView, InventoryView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
     InvoicesReportExporter, CustomerView, InvoicePainterView
@@ -13,7 +13,6 @@ router = DefaultRouter(trailing_slash=False)
 router.register('inventory', InventoryView, "inventory")
 router.register('provider', ProviderView, "provider")
 router.register('inventory-csv', InventoryCSVLoaderView, "inventory-csv")
-router.register('shop', ShopView, "shop")
 router.register('summary', SummaryView, "summary")
 router.register('invoice-painter', InvoicePainterView, "invoice-painter")
 router.register('purchase-summary', PurchaseView, "purchase-summary")
@@ -31,7 +30,6 @@ urlpatterns = [
          UpdateInvoiceView.as_view(), name='update-invoice'),
     path('provider/<int:pk>/', ProviderView.as_view({'put': 'update', 'delete': 'destroy'}), name='provider-detail'),
     path('inventory/<int:pk>/', InventoryView.as_view({'put': 'update', 'delete': 'destroy'}), name='inventory-detail'),
-    path('shop/<int:pk>/', ShopView.as_view({'put': 'update', 'delete': 'destroy'}), name='shop-detail'),
     path('payment-terminal/<int:pk>/', PaymentTerminalView.as_view({'put': 'update', 'delete': 'destroy'}),
          name='payment-terminal-detail'),
     path('daily_report_export/', ReportExporter.as_view(), name='daily_report_export'),
@@ -43,4 +41,12 @@ urlpatterns = [
     path('invoice/<int:pk>/', InvoiceView.as_view({'put': 'update', 'delete': 'destroy'}), name='invoice-detail'),
     path('product_sales_report_export/', ItemsReportExporter.as_view(), name='product_sales_report_export'),
     path('invoices_report_export/', InvoicesReportExporter.as_view(), name='invoices_report_export'),
+    path('inventory/<int:pk>/toggle-active/',
+         InventoryView.as_view({'post': 'toggle_active'}), name='inventory-toggle'),
+    path('provider/<int:pk>/toggle-active/',
+         ProviderView.as_view({'post': 'toggle_active'}), name='provider-toggle'),
+    path('payment-terminal/<int:pk>/toggle-active/',
+         PaymentTerminalView.as_view({'post': 'toggle_active'}), name='terminal-toggle'),
+    path('dian-resolution/<int:pk>/toggle-active/',
+         DianResolutionView.as_view({'post': 'toggle_active'}), name='resolution-toggle'),
 ]

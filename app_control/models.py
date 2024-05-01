@@ -57,6 +57,7 @@ class Provider(models.Model):
     account_type = models.CharField(max_length=50, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -103,6 +104,7 @@ class Inventory(models.Model):
     usd_price = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("code",)
@@ -127,39 +129,6 @@ class Inventory(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.code}"
-
-
-class Shop(models.Model):
-    created_by = models.ForeignKey(
-        CustomUser, null=True, related_name="shops",
-        on_delete=models.SET_NULL
-    )
-    name = models.CharField(max_length=50, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ("-created_at",)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.old_name = self.name
-
-    def save(self, *args, **kwargs):
-        action = f"added new shop - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated shop from - '{self.old_name}' to '{self.name}'"
-        super().save(*args, **kwargs)
-        add_user_activity(self.created_by, action=action)
-
-    def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted shop - '{self.name}'"
-        super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
-
-    def __str__(self):
-        return self.name
 
 
 class Customer(models.Model):
@@ -209,6 +178,7 @@ class PaymentTerminal(models.Model):
     is_wireless = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -321,6 +291,7 @@ class DianResolution(models.Model):
     from_number = models.PositiveIntegerField()
     to_number = models.PositiveIntegerField()
     current_number = models.PositiveIntegerField(default=None)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)

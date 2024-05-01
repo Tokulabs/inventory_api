@@ -15,7 +15,7 @@ from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
-    Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
+    Invoice, InvoiceSerializer, InventoryWithSumSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer,
     CustomerSerializer
 )
@@ -77,6 +77,16 @@ class InventoryView(ModelViewSet):
         inventory.delete()
         return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
 
+    def toggle_active(self, request, pk=None):
+        inventory = Inventory.objects.filter(pk=pk).first()
+        if inventory is None:
+            return Response({'error': 'Inventory not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        inventory.active = not inventory.active
+        inventory.save()
+        serializer = self.serializer_class(inventory)
+        return Response(serializer.data)
+
 
 class ProviderView(ModelViewSet):
     http_method_names = ('get', 'put', 'delete', 'post')
@@ -116,6 +126,16 @@ class ProviderView(ModelViewSet):
         provider = Provider.objects.filter(pk=pk).first()
         provider.delete()
         return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
+
+    def toggle_active(self, request, pk=None):
+        provider = Provider.objects.filter(pk=pk).first()
+        if provider is None:
+            return Response({'error': 'Provider not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        provider.active = not provider.active
+        provider.save()
+        serializer = self.serializer_class(provider)
+        return Response(serializer.data)
 
 
 class CustomerView(ModelViewSet):
@@ -201,49 +221,6 @@ class InventoryGroupView(ModelViewSet):
         return Response({"message": "Inventory Group deleted successfully"}, status=status.HTTP_200_OK)
 
 
-class ShopView(ModelViewSet):
-    http_method_names = ('get', 'post', 'put', 'delete')
-    queryset = Shop.objects.select_related("created_by")
-    serializer_class = ShopSerializer
-    permission_classes = (IsAuthenticatedCustom,)
-    pagination_class = CustomPagination
-
-    def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
-        data = self.request.query_params.dict()
-        data.pop("page", None)
-        keyword = data.pop("keyword", None)
-
-        results = self.queryset.filter(**data)
-
-        if keyword:
-            search_fields = (
-                "created_by__fullname", "created_by__email", "name"
-            )
-            query = get_query(keyword, search_fields)
-            results = results.filter(query)
-
-        return results.order_by('id')
-
-    def create(self, request, *args, **kwargs):
-        request.data.update({"created_by_id": request.user.id})
-        return super().create(request, *args, **kwargs)
-
-    def update(self, request, pk=None):
-        shop = Shop.objects.filter(pk=pk).first()
-        serializer = self.serializer_class(shop, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, pk=None):
-        shop = Shop.objects.filter(pk=pk).first()
-        shop.delete()
-        return Response({"message": "Shop deleted successfully"}, status=status.HTTP_200_OK)
-
-
 class PaymentTerminalView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
     queryset = PaymentTerminal.objects.select_related("created_by")
@@ -284,7 +261,17 @@ class PaymentTerminalView(ModelViewSet):
     def destroy(self, request, pk=None):
         terminal = PaymentTerminal.objects.filter(pk=pk).first()
         terminal.delete()
-        return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Payment Terminal deleted successfully"}, status=status.HTTP_200_OK)
+
+    def toggle_active(self, request, pk=None):
+        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        if terminal is None:
+            return Response({'error': 'Payment Terminal not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        terminal.active = not terminal.active
+        terminal.save()
+        serializer = self.serializer_class(terminal)
+        return Response(serializer.data)
 
 
 class InvoiceView(ModelViewSet):
@@ -314,11 +301,17 @@ class InvoiceView(ModelViewSet):
 
         return results
 
-
     def create(self, request, *args, **kwargs):
+        dian_resolution = DianResolution.objects.filter(active=True).first()
+        if not dian_resolution:
+            raise Exception("You need to have an active dian resolution to create invoices")
+
         try:
+            if not request.data.get("sale_by_id"):
+                request.data.update({"sale_by_id": request.user.id})
+
             request.data.update({"created_by_id": request.user.id})
-            dian_resolution = DianResolution.objects.first()
+
             new_current_number = dian_resolution.current_number + 1
             dian_resolution_document_number = dian_resolution.document_number
             dian_resolution.current_number = new_current_number
@@ -381,13 +374,11 @@ class SummaryView(ModelViewSet):
             total_in_storage__gt=0
         ).count()
         total_group = InventoryGroupView.queryset.count()
-        total_shop = ShopView.queryset.count()
         total_users = CustomUser.objects.filter(is_superuser=False).count()
 
         return Response({
             "total_inventory": total_inventory,
             "total_group": total_group,
-            "total_shop": total_shop,
             "total_users": total_users
         })
 
@@ -409,7 +400,6 @@ class InvoicePainterView(ModelViewSet):
                 return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
             else:
                 return Response(InvoiceSerializer(invoice).data)
-
 
 
 class SalePerformance(ModelViewSet):
@@ -592,11 +582,22 @@ class DianResolutionView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+
+        if DianResolution.objects.all().filter(active=True).exists():
+            raise Exception("You can't have more than one active dian resolution, "
+                            "please deactivate the current one first")
+
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         dian_res = DianResolution.objects.filter(pk=pk).first()
         serializer = self.serializer_class(dian_res, data=request.data)
+
+        if request.data.get("active", True) is True:
+            if DianResolution.objects.all().filter(active=True).exists():
+                raise Exception("You can't have more than one active dian resolution, "
+                                "please deactivate the current one first")
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -606,6 +607,20 @@ class DianResolutionView(ModelViewSet):
         dian_res = DianResolution.objects.filter(pk=pk).first()
         dian_res.delete()
         return Response({"message": "Dian Resolution deleted successfully"}, status=status.HTTP_200_OK)
+
+    def toggle_active(self, request, pk=None):
+        resolution = DianResolution.objects.filter(pk=pk).first()
+        if resolution is None:
+            return Response({'error': 'Dian Resolution not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if DianResolution.objects.all().filter(active=True).exists() and resolution.active is False:
+            raise Exception("You can't have more than one active dian resolution, "
+                            "please deactivate the current one first")
+
+        resolution.active = not resolution.active
+        resolution.save()
+        serializer = self.serializer_class(resolution)
+        return Response(serializer.data)
 
 
 class ReportExporter(APIView):
