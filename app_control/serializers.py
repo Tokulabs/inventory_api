@@ -1,6 +1,6 @@
-from .models import (Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution,
+from .models import (Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
                      PaymentTerminal, Provider, Customer)
-from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, Provider, PaymentTerminal
+from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, PaymentTerminal
 from user_control.serializers import CustomUserSerializer
 from rest_framework import serializers
 
@@ -46,17 +46,6 @@ class InventorySerializer(serializers.ModelSerializer):
 
 class InventoryWithSumSerializer(InventorySerializer):
     sum_of_item = serializers.IntegerField()
-
-
-class ShopSerializer(serializers.ModelSerializer):
-    created_by = CustomUserSerializer(read_only=True)
-    created_by_id = serializers.CharField(write_only=True, required=False)
-    amount_total = serializers.CharField(read_only=True, required=False)
-    count_total = serializers.CharField(read_only=True, required=False)
-
-    class Meta:
-        model = Shop
-        fields = "__all__"
 
 
 class UserWithAmounSerializer(serializers.Serializer):

@@ -15,7 +15,7 @@ from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
-    Shop, ShopSerializer, Invoice, InvoiceSerializer, InventoryWithSumSerializer,
+    Invoice, InvoiceSerializer, InventoryWithSumSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer,
     CustomerSerializer
 )
@@ -201,49 +201,6 @@ class InventoryGroupView(ModelViewSet):
         return Response({"message": "Inventory Group deleted successfully"}, status=status.HTTP_200_OK)
 
 
-class ShopView(ModelViewSet):
-    http_method_names = ('get', 'post', 'put', 'delete')
-    queryset = Shop.objects.select_related("created_by")
-    serializer_class = ShopSerializer
-    permission_classes = (IsAuthenticatedCustom,)
-    pagination_class = CustomPagination
-
-    def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
-        data = self.request.query_params.dict()
-        data.pop("page", None)
-        keyword = data.pop("keyword", None)
-
-        results = self.queryset.filter(**data)
-
-        if keyword:
-            search_fields = (
-                "created_by__fullname", "created_by__email", "name"
-            )
-            query = get_query(keyword, search_fields)
-            results = results.filter(query)
-
-        return results.order_by('id')
-
-    def create(self, request, *args, **kwargs):
-        request.data.update({"created_by_id": request.user.id})
-        return super().create(request, *args, **kwargs)
-
-    def update(self, request, pk=None):
-        shop = Shop.objects.filter(pk=pk).first()
-        serializer = self.serializer_class(shop, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, pk=None):
-        shop = Shop.objects.filter(pk=pk).first()
-        shop.delete()
-        return Response({"message": "Shop deleted successfully"}, status=status.HTTP_200_OK)
-
-
 class PaymentTerminalView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
     queryset = PaymentTerminal.objects.select_related("created_by")
@@ -387,13 +344,11 @@ class SummaryView(ModelViewSet):
             total_in_storage__gt=0
         ).count()
         total_group = InventoryGroupView.queryset.count()
-        total_shop = ShopView.queryset.count()
         total_users = CustomUser.objects.filter(is_superuser=False).count()
 
         return Response({
             "total_inventory": total_inventory,
             "total_group": total_group,
-            "total_shop": total_shop,
             "total_users": total_users
         })
 
