@@ -57,6 +57,7 @@ class Provider(models.Model):
     account_type = models.CharField(max_length=50, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -103,6 +104,7 @@ class Inventory(models.Model):
     usd_price = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("code",)
@@ -176,6 +178,7 @@ class PaymentTerminal(models.Model):
     is_wireless = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)

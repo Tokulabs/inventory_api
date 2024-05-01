@@ -41,4 +41,12 @@ urlpatterns = [
     path('invoice/<int:pk>/', InvoiceView.as_view({'put': 'update', 'delete': 'destroy'}), name='invoice-detail'),
     path('product_sales_report_export/', ItemsReportExporter.as_view(), name='product_sales_report_export'),
     path('invoices_report_export/', InvoicesReportExporter.as_view(), name='invoices_report_export'),
+    path('inventory/<int:pk>/toggle-active/',
+         InventoryView.as_view({'post': 'toggle_active'}), name='inventory-toggle'),
+    path('provider/<int:pk>/toggle-active/',
+         ProviderView.as_view({'post': 'toggle_active'}), name='provider-toggle'),
+    path('payment-terminal/<int:pk>/toggle-active/',
+         PaymentTerminalView.as_view({'post': 'toggle_active'}), name='terminal-toggle'),
+    path('dian-resolution/<int:pk>/toggle-active/',
+         DianResolutionView.as_view({'post': 'toggle_active'}), name='resolution-toggle'),
 ]

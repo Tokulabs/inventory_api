@@ -77,6 +77,16 @@ class InventoryView(ModelViewSet):
         inventory.delete()
         return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
 
+    def toggle_active(self, request, pk=None):
+        inventory = Inventory.objects.filter(pk=pk).first()
+        if inventory is None:
+            return Response({'error': 'Inventory not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        inventory.active = not inventory.active
+        inventory.save()
+        serializer = self.serializer_class(inventory)
+        return Response(serializer.data)
+
 
 class ProviderView(ModelViewSet):
     http_method_names = ('get', 'put', 'delete', 'post')
@@ -116,6 +126,16 @@ class ProviderView(ModelViewSet):
         provider = Provider.objects.filter(pk=pk).first()
         provider.delete()
         return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
+
+    def toggle_active(self, request, pk=None):
+        provider = Provider.objects.filter(pk=pk).first()
+        if provider is None:
+            return Response({'error': 'Provider not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        provider.active = not provider.active
+        provider.save()
+        serializer = self.serializer_class(provider)
+        return Response(serializer.data)
 
 
 class CustomerView(ModelViewSet):
@@ -241,7 +261,17 @@ class PaymentTerminalView(ModelViewSet):
     def destroy(self, request, pk=None):
         terminal = PaymentTerminal.objects.filter(pk=pk).first()
         terminal.delete()
-        return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Payment Terminal deleted successfully"}, status=status.HTTP_200_OK)
+
+    def toggle_active(self, request, pk=None):
+        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        if terminal is None:
+            return Response({'error': 'Payment Terminal not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        terminal.active = not terminal.active
+        terminal.save()
+        serializer = self.serializer_class(terminal)
+        return Response(serializer.data)
 
 
 class InvoiceView(ModelViewSet):
@@ -577,6 +607,20 @@ class DianResolutionView(ModelViewSet):
         dian_res = DianResolution.objects.filter(pk=pk).first()
         dian_res.delete()
         return Response({"message": "Dian Resolution deleted successfully"}, status=status.HTTP_200_OK)
+
+    def toggle_active(self, request, pk=None):
+        resolution = DianResolution.objects.filter(pk=pk).first()
+        if resolution is None:
+            return Response({'error': 'Dian Resolution not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if DianResolution.objects.all().filter(active=True).exists() and resolution.active is False:
+            raise Exception("You can't have more than one active dian resolution, "
+                            "please deactivate the current one first")
+
+        resolution.active = not resolution.active
+        resolution.save()
+        serializer = self.serializer_class(resolution)
+        return Response(serializer.data)
 
 
 class ReportExporter(APIView):
