@@ -4,6 +4,10 @@ import factory
 import factory.fuzzy
 import random
 
+from factory import Factory, Faker as FactoryFaker
+
+from factory.fuzzy import FuzzyText
+
 from datetime import datetime
 
 from random import randint, uniform
@@ -38,7 +42,7 @@ class InventoryGroupFactory(factory.django.DjangoModelFactory):
         model = InventoryGroup
 
     created_by = User.objects.get_or_create(id="1")[0]
-    name = factory.Faker("word", locale="es_MX")
+    name = factory.fuzzy.FuzzyText(length=10)
 
 
 class InventoryFactory(factory.django.DjangoModelFactory):
@@ -50,7 +54,7 @@ class InventoryFactory(factory.django.DjangoModelFactory):
     photo = factory.Faker("image_url")
     provider = factory.SubFactory(ProviderFactory)
     group = factory.SubFactory(InventoryGroupFactory)
-    name = factory.Faker("word", locale="es_MX")
+    name = factory.fuzzy.FuzzyText(length=10)
     total_in_shops = factory.LazyAttribute(lambda _: randint(0, 100))
     total_in_storage = factory.LazyAttribute(lambda _: randint(0, 1000))
     selling_price = factory.LazyAttribute(lambda _: randint(1000, 1000000))
@@ -64,7 +68,7 @@ class CustomerFactory(factory.django.DjangoModelFactory):
         model = Customer
 
     created_by = User.objects.get_or_create(id="1")[0]
-    document_id = factory.Faker("passport_number")
+    document_id = factory.LazyAttribute(lambda _: randint(1000000, 9999999))
     name = factory.Faker("company", locale="es_MX")
     phone = factory.LazyAttribute(lambda _: randint(1000000, 9999999))
     email = factory.Faker("company_email")
@@ -77,7 +81,7 @@ class PaymentTerminalFactory(factory.django.DjangoModelFactory):
 
     created_by = User.objects.get_or_create(id="1")[0]
     account_code = factory.Faker("bban")
-    name = factory.Faker("word", locale="es_MX")
+    name = factory.fuzzy.FuzzyText(length=10)
     is_wireless = factory.Faker("boolean")
     active = factory.Faker("boolean")
 
@@ -134,9 +138,9 @@ class InvoiceItemFactory(factory.django.DjangoModelFactory):
 
     invoice = factory.SubFactory(InvoiceFactory)
     item = factory.SubFactory(InventoryFactory)
-    item_name = factory.Faker("word", locale="es_MX")
+    item_name = factory.fuzzy.FuzzyText(length=10)
     item_code = factory.Faker("ean", length=8)
-    quantity = factory.LazyAttribute(lambda _: randint(0, 100))
+    quantity = factory.LazyAttribute(lambda obj: obj.item.total_in_shops - 1)
     original_amount = factory.LazyAttribute(lambda _: randint(1000, 1000000))
     original_usd_amount = factory.LazyAttribute(lambda obj: obj.amount / 3900)
     discount = factory.LazyAttribute(lambda _: Decimal(random.uniform(0.00, 100.00)))
