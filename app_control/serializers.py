@@ -98,6 +98,15 @@ class PaymentTerminalSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class DianSerializer(serializers.ModelSerializer):
+    created_by = CustomUserSerializer(read_only=True)
+    created_by_id = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = DianResolution
+        fields = "__all__"
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
@@ -110,7 +119,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
     payment_methods = PaymentMethodSerializer(many=True)
     sale_by = CustomUserSerializer(read_only=True)
     sale_by_id = serializers.CharField(write_only=True, required=False)
-    dian_document_number = serializers.CharField(required=False)
+    dian_resolution = DianSerializer(read_only=True)
+    dian_resolution_id = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Invoice
@@ -173,12 +183,3 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 invoice=invoice, **payment_method_data)
 
         return invoice
-
-
-class DianSerializer(serializers.ModelSerializer):
-    created_by = CustomUserSerializer(read_only=True)
-    created_by_id = serializers.CharField(write_only=True, required=False)
-
-    class Meta:
-        model = DianResolution
-        fields = "__all__"
