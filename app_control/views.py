@@ -277,7 +277,7 @@ class PaymentTerminalView(ModelViewSet):
 class InvoiceView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
     queryset = Invoice.objects.select_related(
-        "created_by", "sale_by", "payment_terminal").prefetch_related("invoice_items")
+        "created_by", "sale_by", "payment_terminal", "dian_resolution").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
@@ -294,7 +294,7 @@ class InvoiceView(ModelViewSet):
 
         if keyword:
             search_fields = (
-                "created_by__fullname", "created_by__email", "invoice_number", "dian_document_number"
+                "created_by__fullname", "created_by__email", "invoice_number", "dian_resolution__document_number",
             )
             query = get_query(keyword, search_fields)
             results = results.filter(query)
@@ -313,12 +313,12 @@ class InvoiceView(ModelViewSet):
             request.data.update({"created_by_id": request.user.id})
 
             new_current_number = dian_resolution.current_number + 1
-            dian_resolution_document_number = dian_resolution.document_number
+            dian_resolution_document_number = dian_resolution.id
             dian_resolution.current_number = new_current_number
             dian_resolution.save()
 
             request.data.update(
-                {"dian_document_number": dian_resolution_document_number, "invoice_number": new_current_number})
+                {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
             return super().create(request, *args, **kwargs)
         except Exception as e:
             dian_resolution.current_number -= 1
