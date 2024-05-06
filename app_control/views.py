@@ -469,7 +469,6 @@ class SalesByUsersView(ModelViewSet):
         return Response(sales_by_user)
 
 
-
 class PurchaseView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
