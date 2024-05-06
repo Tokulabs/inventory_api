@@ -478,11 +478,11 @@ def create_product_sales_report(ws, report_data, report_data_nulled, report_data
 
 def create_invoices_report(ws, report_data):
     row_titles = ["FECHA", "VENDEDOR", "NUMERO DE FACTURA", "DOCUMENTO DIAN", "DATAFONO", "TOTAL", "ID CLIENTE",
-                  "NOMBRE CLIENTE", "EMAIL CLIENTE", "TELEFONO CLIENTE"]
+                  "NOMBRE CLIENTE", "EMAIL CLIENTE", "TELEFONO CLIENTE", "DIRECCION CLIENTE"]
     add_values_to_row_multiple_columns(1, 1, row_titles, ws)
     apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=1, ws=ws,
                           font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
-    for column in range(1, 13):
+    for column in range(1, 14):
         ws.column_dimensions[get_column_letter(column)].width = 20
 
     for row_idx, row_data in enumerate(report_data, start=2):

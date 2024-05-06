@@ -16,7 +16,7 @@ from inventory_api.excel_manager import apply_styles_to_cells
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, InventoryWithSumSerializer,
-    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmounSerializer,
+    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
     CustomerSerializer
 )
 from rest_framework.response import Response
@@ -434,30 +434,39 @@ class SalePerformance(ModelViewSet):
 class SalesByUsersView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
-    queryset = CustomUser.objects.filter(is_superuser=False)
 
     def list(self, request, *args, **kwargs):
-        query_data = request.query_params.dict()
-        total = query_data.get('total', None)
-        query = self.queryset
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
 
-        if not total:
-            start_date = query_data.get("start_date", None)
-            end_date = query_data.get("end_date", None)
-
-            if start_date:
-                query = query.filter(
-                    invoices__created_at__range=[
-                        start_date, end_date]
+        if not start_date or not end_date:
+            sales_by_user = (
+                Invoice.objects.select_related("InvoiceItems", "sale_by")
+                .all()
+                .filter(is_override=False)
+                .values_list(
+                    "sale_by__fullname"
                 )
-        users = query.filter(invoices__is_override=False).annotate(
-            sum_of_item=Coalesce(
-                Sum("invoices__invoice_items__quantity"), 0
+                .annotate(
+                    total_invoice=Sum("invoice_items__amount"),
+                )
             )
-        ).order_by('-sum_of_item')[0:10]
+        else:
+            sales_by_user = (
+                Invoice.objects.select_related("InvoiceItems", "sale_by")
+                .all()
+                .filter(is_override=False)
+                .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+                .values(
+                    "sale_by__id",
+                    "sale_by__fullname"
+                )
+                .annotate(
+                    total_invoice=Sum("invoice_items__amount"),
+                )
+            )
 
-        response_data = UserWithAmounSerializer(users, many=True).data
-        return Response(response_data)
+        return Response(sales_by_user)
 
 
 class PurchaseView(ModelViewSet):
@@ -481,9 +490,9 @@ class PurchaseView(ModelViewSet):
             query = query.exclude(invoice__is_override=True)
 
         results = query.aggregate(
-            amount_total=Sum(F('amount') * F('quantity')),
+            amount_total=Sum(F('amount')),
             total=Sum('quantity'),
-            amount_total_usd=Sum(F('usd_amount') * F('quantity'),
+            amount_total_usd=Sum(F('usd_amount'),
                                  filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
@@ -652,7 +661,7 @@ class ReportExporter(APIView):
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(payment_methods__name="creditCard")
-            .values_list("payment_terminal__name", "created_by__fullname")
+            .values_list("payment_terminal__name", "sale_by__fullname")
             .annotate(
                 quantity=Count("id"),
                 total=Sum("payment_methods__paid_amount")
@@ -667,7 +676,7 @@ class ReportExporter(APIView):
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(is_dollar=True)
-            .values_list("created_by__fullname")
+            .values_list("sale_by__fullname")
             .annotate(
                 quantity=Sum("invoice_items__usd_amount")
             )
@@ -680,7 +689,7 @@ class ReportExporter(APIView):
             .all()
             .filter(is_override=False)
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .values_list("created_by__fullname")
+            .values_list("sale_by__fullname")
             .annotate(
                 quantity=Sum("invoice_items__amount")
             )
@@ -692,7 +701,7 @@ class ReportExporter(APIView):
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(is_dollar=True)
-            .values_list("created_by__fullname")
+            .values_list("sale_by__fullname")
             .annotate(
                 quantity=Sum("invoice_items__amount")
             )
@@ -704,7 +713,7 @@ class ReportExporter(APIView):
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(payment_methods__name="creditCard")
-            .values_list("created_by__fullname")
+            .values_list("sale_by__fullname")
             .annotate(
                 total=Sum("payment_methods__paid_amount")
             )
@@ -844,9 +853,10 @@ class InvoicesReportExporter(APIView):
                 total_invoice=Sum("invoice_items__amount"),
             )
             .values_list(
-                "created_at__date", "created_by__fullname", "invoice_number", "dian_document_number",
+                "created_at__date", "sale_by__fullname", "invoice_number", "dian_resolution__document_number",
                 "payment_terminal__name", "total_invoice",
                 "customer__document_id", "customer__name", "customer__email", "customer__phone",
+                "customer__address"
             )
         )
 

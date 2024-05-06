@@ -48,9 +48,9 @@ class InventoryWithSumSerializer(InventorySerializer):
     sum_of_item = serializers.IntegerField()
 
 
-class UserWithAmounSerializer(serializers.Serializer):
+class UserWithAmountSerializer(serializers.Serializer):
     user = CustomUserSerializer()
-    amount = serializers.FloatField()
+    total_invoice = serializers.FloatField()
 
 
 class CustomerSerializer(serializers.ModelSerializer):
