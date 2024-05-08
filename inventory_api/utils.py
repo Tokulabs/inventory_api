@@ -98,6 +98,9 @@ def get_query(query_string, search_fields):
 
 
 def create_terminals_report(ws, report_data):
+    if not report_data:
+        return 3
+
     current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted(set([item[1].upper() for item in report_data]))
     second_row_text = ["CANT", "DATAFONO"] + list(users) + ["TOTAL DIA"]
@@ -180,6 +183,9 @@ def create_terminals_report(ws, report_data):
 
 
 def create_dollars_report(ws, report_data, last_row):
+    if not report_data:
+        return last_row + 1
+
     beginning_row = last_row + 1
     current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted([item[0].upper() for item in report_data])
@@ -242,12 +248,16 @@ def create_dollars_report(ws, report_data, last_row):
     # apply english accounting format to all from second_row_text[2:] from beginning_row + 2 to beginning_row + 5
     for column in second_row_text[2:]:
         for row in range(beginning_row + 2, beginning_row + 6):
-            ws[f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+            ws[
+                f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
     return beginning_row + 6
 
 
 def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_data, cards_report_data):
+    if not report_data:
+        return last_row + 1, last_row_cards + 1
+
     beginning_row = last_row + 1
     current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted([item[0].upper() for item in report_data])
@@ -362,6 +372,123 @@ def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_
     # apply english accounting format to all from second_row_text[2:] from beginning_row + 2 to beginning_row + 12
     for column in second_row_text[2:]:
         for row in range(beginning_row + 2, beginning_row + 13):
-            ws[f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+            ws[
+                f"{get_column_letter(second_row_text.index(column) + 1)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
     return beginning_row + 13, second_row_text.index("TOTAL DIA") + 1
+
+
+def create_inventory_report(ws, report_data):
+    row_titles = ["CATEGORIA", "GRUPO", "CODIGO", "NOMBRE", "CANTIDAD BODEGA", "CANTIDAD TIENDA", "COSTO UNIDAD",
+                  "VALOR VENTA UNIDAD",
+                  "COSTO TOTAL BODEGA", "COSTO TOTAL TIENDA", "TOTAL VENTA BODEGA",
+                  "TOTAL VENTA TIENDA", "UNIDAD"]
+    add_values_to_row_multiple_columns(1, 1, row_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
+    for column in range(1, 13):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+
+    for row_idx, row_data in enumerate(report_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    # apply english accounting format to all columns from 6 to 11
+    for column in range(7, 13):
+        for row in range(2, len(report_data) + 2):
+            ws[f"{get_column_letter(column)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+
+
+def create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date):
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+    ws['A1'] = "SIGNOS STUDIO SAS"
+
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
+    ws['A2'] = "NIT. 832004603-8"
+
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=3)
+    ws['A3'] = f"Del {start_date} al {end_date}"
+
+    ws.merge_cells(start_row=4, start_column=1, end_row=4, end_column=3)
+    ws.merge_cells(start_row=6, start_column=1, end_row=6, end_column=3)
+
+    row_titles = ["Cod.", "Descripción", "Cant."]
+    add_values_to_row_multiple_columns(1, 5, row_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=5, ws=ws,
+                          font=headers_font, alignment=alignment, fill=None, border=None)
+
+    for column in range(1, 4):
+        ws.column_dimensions[get_column_letter(column)].width = 15
+
+    if report_data:
+        for row_idx, row_data in enumerate(report_data, start=7):
+            for col_idx, cell_value in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+        # compute total for 3rd column from 7 to len(report_data) + 6
+        total_formula = sum_formula_text(7, len(report_data) + 6, 3, 3)
+        ws.cell(row=len(report_data) + 7, column=2, value="TOTAL")
+        ws.cell(row=len(report_data) + 7, column=3, value=total_formula)
+
+        apply_styles_to_cells(start_column=1, start_row=len(report_data) + 7, end_column=3, end_row=len(report_data) + 7,
+                              ws=ws,
+                              font=headers_font, alignment=None, fill=None, border=None)
+
+    if report_data_nulled:
+        ws.cell(row=len(report_data) + 8, column=1, value="Anulados")
+        for row_idx, row_data in enumerate(report_data_nulled, start=len(report_data) + 9):
+            for col_idx, cell_value in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+        total_formula = sum_formula_text(len(report_data) + 9, len(report_data) + 8 + len(report_data_nulled), 3, 3)
+        ws.cell(row=len(report_data) + 9 + len(report_data_nulled), column=2, value="TOTAL")
+        ws.cell(row=len(report_data) + 9 + len(report_data_nulled), column=3, value=total_formula)
+
+    apply_styles_to_cells(start_column=1, start_row=len(report_data) + 8, end_column=3, end_row=len(report_data) + 8,
+                          ws=ws,
+                          font=headers_font, alignment=None, fill=None, border=None)
+    apply_styles_to_cells(start_column=1, start_row=len(report_data) + 9 + len(report_data_nulled),
+                          end_column=3, end_row=len(report_data) + 9 + len(report_data_nulled),
+                          ws=ws,
+                          font=headers_font, alignment=None, fill=None, border=None)
+
+    if report_data_gifts:
+        ws.cell(row=len(report_data) + 10 + len(report_data_nulled), column=1, value="Regalos")
+        for row_idx, row_data in enumerate(report_data_gifts, start=len(report_data) + 11 + len(report_data_nulled)):
+            for col_idx, cell_value in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+        total_formula = sum_formula_text(len(report_data) + 11 + len(report_data_nulled),
+                                         len(report_data) + 10 + len(report_data_nulled) + len(report_data_gifts), 3, 3)
+        ws.cell(row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts), column=2, value="TOTAL")
+        ws.cell(row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts), column=3,
+                value=total_formula)
+
+        apply_styles_to_cells(start_column=1, start_row=len(report_data) + 10 + len(report_data_nulled),
+                              end_column=3, end_row=len(report_data) + 10 + len(report_data_nulled),
+                              ws=ws,
+                              font=headers_font, alignment=None, fill=None, border=None)
+        apply_styles_to_cells(start_column=1,
+                              start_row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts),
+                              end_column=3,
+                              end_row=len(report_data) + 11 + len(report_data_nulled) + len(report_data_gifts),
+                              ws=ws,
+                              font=headers_font, alignment=None, fill=None, border=None)
+
+
+def create_invoices_report(ws, report_data):
+    row_titles = ["FECHA", "VENDEDOR", "NUMERO DE FACTURA", "DOCUMENTO DIAN", "DATAFONO", "TOTAL", "ID CLIENTE",
+                  "NOMBRE CLIENTE", "EMAIL CLIENTE", "TELEFONO CLIENTE", "DIRECCION CLIENTE"]
+    add_values_to_row_multiple_columns(1, 1, row_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(row_titles), end_row=1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
+    for column in range(1, 14):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+
+    for row_idx, row_data in enumerate(report_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    # apply english accounting format to all columns from 6 to 11
+    for row in range(2, len(report_data) + 2):
+        ws[f"{get_column_letter(6)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'

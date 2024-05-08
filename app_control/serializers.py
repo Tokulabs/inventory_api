@@ -1,6 +1,6 @@
-from .models import (Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution,
-                     PaymentTerminal, Provider)
-from .models import Inventory, InventoryGroup, PaymentMethod, Shop, Invoice, InvoiceItem, DianResolution, Provider, PaymentTerminal
+from .models import (Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
+                     PaymentTerminal, Provider, Customer)
+from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, PaymentTerminal
 from user_control.serializers import CustomUserSerializer
 from rest_framework import serializers
 
@@ -48,19 +48,19 @@ class InventoryWithSumSerializer(InventorySerializer):
     sum_of_item = serializers.IntegerField()
 
 
-class ShopSerializer(serializers.ModelSerializer):
+class UserWithAmountSerializer(serializers.Serializer):
+    user = CustomUserSerializer()
+    total_invoice = serializers.FloatField()
+
+
+class CustomerSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
-    amount_total = serializers.CharField(read_only=True, required=False)
-    count_total = serializers.CharField(read_only=True, required=False)
 
     class Meta:
-        model = Shop
+        model = Customer
         fields = "__all__"
 
-class UserWithAmounSerializer(serializers.Serializer):
-    user = CustomUserSerializer()
-    amount = serializers.FloatField()
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
     invoice = serializers.CharField(read_only=True)
@@ -76,6 +76,10 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 class InvoiceItemDataSerializer(serializers.Serializer):
     item_id = serializers.CharField()
     quantity = serializers.IntegerField()
+    discount = serializers.FloatField()
+    amount = serializers.FloatField()
+    usd_amount = serializers.FloatField()
+    is_gift = serializers.BooleanField()
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
@@ -94,16 +98,29 @@ class PaymentTerminalSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class DianSerializer(serializers.ModelSerializer):
+    created_by = CustomUserSerializer(read_only=True)
+    created_by_id = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model = DianResolution
+        fields = "__all__"
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     payment_terminal = PaymentTerminalSerializer(read_only=True)
-    payment_terminal_id = serializers.CharField(write_only=True)
+    payment_terminal_id = serializers.CharField(write_only=True, required=False, allow_null=True)
+    customer = CustomerSerializer(read_only=True)
+    customer_id = serializers.CharField(write_only=True)
     invoice_items = InvoiceItemSerializer(read_only=True, many=True)
     invoice_item_data = InvoiceItemDataSerializer(write_only=True, many=True)
     payment_methods = PaymentMethodSerializer(many=True)
     sale_by = CustomUserSerializer(read_only=True)
     sale_by_id = serializers.CharField(write_only=True, required=False)
+    dian_resolution = DianSerializer(read_only=True)
+    dian_resolution_id = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Invoice
@@ -137,11 +154,32 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
         return invoice
 
+    def update(self, instance, validated_data):
+        invoice_item_data = validated_data.pop("invoice_item_data")
+        payment_methods_data = validated_data.pop("payment_methods", [])
 
-class DianSerializer(serializers.ModelSerializer):
-    created_by = CustomUserSerializer(read_only=True)
-    created_by_id = serializers.CharField(write_only=True, required=False)
+        if not invoice_item_data:
+            raise Exception("You need to provide at least one Invoice item")
 
-    class Meta:
-        model = DianResolution
-        fields = "__all__"
+        if not payment_methods_data:
+            raise Exception("You need to provide at least one Payment method")
+
+        invoice = super().update(instance, validated_data)
+
+        InvoiceItem.objects.filter(invoice=invoice).delete()
+        PaymentMethod.objects.filter(invoice=invoice).delete()
+
+        invoice_item_serializer = InvoiceItemSerializer(data=[
+            {"invoice_id": invoice.id, **item} for item in invoice_item_data
+        ], many=True)
+
+        if invoice_item_serializer.is_valid():
+            invoice_item_serializer.save()
+        else:
+            raise Exception(invoice_item_serializer.errors)
+
+        for payment_method_data in payment_methods_data:
+            PaymentMethod.objects.create(
+                invoice=invoice, **payment_method_data)
+
+        return invoice

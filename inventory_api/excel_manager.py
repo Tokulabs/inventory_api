@@ -31,7 +31,8 @@ def apply_styles_to_cells(
         ws,
         font=None,
         alignment=None,
-        fill=None
+        fill=None,
+        border=None
 ):
     for row in ws.iter_rows(min_row=start_row, max_row=end_row, min_col=start_column, max_col=end_column):
         for cell in row:
@@ -41,6 +42,8 @@ def apply_styles_to_cells(
                 cell.alignment = alignment
             if fill:
                 cell.fill = fill
+            if border:
+                cell.border = border
 
 
 def sum_formula_text(

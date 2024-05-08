@@ -148,28 +148,23 @@ class UserActivitiesView(ModelViewSet):
 
 class UsersView(ModelViewSet):
     serializer_class = CustomUserSerializer
-    http_method_names = ["get", "put", "patch"]
+    http_method_names = ["get", "put", "post"]
     permission_classes = (IsAuthenticatedCustom, )
     pagination_class = CustomPagination
 
     def get_queryset(self):
         if self.request.method.lower() != "get":
             return CustomUser.objects.all()
-
         data = self.request.query_params.dict()
         role = data.pop("role", None)
-
         queryset = CustomUser.objects.filter(is_superuser=False)
-
         if role is not None:
             queryset = queryset.filter(role=role)
-
         keyword = data.pop("keyword", None)
         if keyword:
             search_fields = ("fullname", "email", "role")
             query = get_query(keyword, search_fields)
             queryset = queryset.filter(query)
-
         return queryset
 
     def update(self, request, pk=None):
@@ -179,3 +174,14 @@ class UsersView(ModelViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def toggle_is_active(self, request, pk=None):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if user is None:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user.is_active = not user.is_active
+        user.save()
+
+        serializer = self.serializer_class(user)
+        return Response(serializer.data)

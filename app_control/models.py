@@ -51,8 +51,13 @@ class Provider(models.Model):
     name = models.CharField(max_length=50, unique=True)
     legal_name = models.CharField(max_length=100, null=True)
     nit = models.CharField(max_length=20, null=True)
+    phone = models.CharField(max_length=20, null=True)
+    email = models.EmailField(null=True)
+    bank_account = models.CharField(max_length=50, null=True)
+    account_type = models.CharField(max_length=50, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -99,6 +104,7 @@ class Inventory(models.Model):
     usd_price = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("code",)
@@ -125,12 +131,16 @@ class Inventory(models.Model):
         return f"{self.name} - {self.code}"
 
 
-class Shop(models.Model):
+class Customer(models.Model):
     created_by = models.ForeignKey(
-        CustomUser, null=True, related_name="shops",
+        CustomUser, null=True, related_name="customers",
         on_delete=models.SET_NULL
     )
-    name = models.CharField(max_length=50, unique=True)
+    document_id = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=50)
+    phone = models.CharField(max_length=20, null=True)
+    email = models.EmailField(null=True)
+    address = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -142,15 +152,15 @@ class Shop(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new shop - '{self.name}'"
+        action = f"added new customer - '{self.name}'"
         if self.pk is not None:
-            action = f"updated shop from - '{self.old_name}' to '{self.name}'"
+            action = f"updated customer from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
         add_user_activity(self.created_by, action=action)
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
-        action = f"deleted shop - '{self.name}'"
+        action = f"deleted customer - '{self.name}'"
         super().delete(*args, **kwargs)
         add_user_activity(created_by, action=action)
 
@@ -168,6 +178,7 @@ class PaymentTerminal(models.Model):
     is_wireless = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True, null=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -187,6 +198,29 @@ class PaymentTerminal(models.Model):
         add_user_activity(created_by, action=action)
 
 
+class DianResolution(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="dian_resolution",
+        on_delete=models.SET_NULL
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    document_number = models.CharField(max_length=255, unique=True)
+    from_date = models.DateField()
+    to_date = models.DateField()
+    from_number = models.PositiveIntegerField()
+    to_number = models.PositiveIntegerField()
+    current_number = models.PositiveIntegerField(default=None)
+    active = models.BooleanField(default=True, null=False)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def save(self, *args, **kwargs):
+        if self.pk is None:  # se está creando un nuevo objeto
+            self.current_number = self.from_number
+        super().save(*args, **kwargs)
+
+
 class Invoice(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="invoices",
@@ -194,16 +228,15 @@ class Invoice(models.Model):
     )
     payment_terminal = models.ForeignKey(
         PaymentTerminal, related_name="payment_terminal", null=True, on_delete=models.SET_NULL)
+    customer = models.ForeignKey(
+        Customer, related_name="customer", null=True, on_delete=models.SET_NULL)
     is_dollar = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    customer_name = models.CharField(max_length=255, null=True)
-    customer_id = models.CharField(max_length=255, null=True)
-    customer_email = models.CharField(max_length=255, null=True)
-    customer_phone = models.CharField(max_length=255, null=True)
     sale_by = models.ForeignKey(
         CustomUser, related_name="sale_by", null=True, on_delete=models.SET_NULL)
     invoice_number = models.CharField(max_length=255, unique=True, null=True)
-    dian_document_number = models.CharField(max_length=255, null=True)
+    dian_resolution = models.ForeignKey(
+        DianResolution, related_name="dian_resolution", null=True, on_delete=models.SET_NULL)
     is_override = models.BooleanField(default=False)
 
     class Meta:
@@ -244,6 +277,10 @@ class InvoiceItem(models.Model):
     quantity = models.PositiveIntegerField()
     amount = models.FloatField(null=True)
     usd_amount = models.FloatField(null=True)
+    discount = models.FloatField(default=0)
+    original_amount = models.FloatField(null=True)
+    original_usd_amount = models.FloatField(null=True)
+    is_gift = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if self.item.total_in_shops < self.quantity:
@@ -252,9 +289,11 @@ class InvoiceItem(models.Model):
 
         self.item_name = self.item.name
         self.item_code = self.item.code
+        self.amount = self.amount
+        self.usd_amount = self.usd_amount
 
-        self.amount = self.quantity * self.item.selling_price
-        self.usd_amount = self.quantity * self.item.usd_price
+        self.original_amount = self.quantity * self.item.selling_price
+        self.original_usd_amount = self.quantity * self.item.usd_price
         self.item.total_in_shops = self.item.total_in_shops - self.quantity
         self.item.save()
 
@@ -262,25 +301,3 @@ class InvoiceItem(models.Model):
 
     def __str__(self):
         return f"{self.item_code} - {self.quantity}"
-
-
-class DianResolution(models.Model):
-    created_by = models.ForeignKey(
-        CustomUser, null=True, related_name="dian_resolution",
-        on_delete=models.SET_NULL
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    document_number = models.CharField(max_length=255, unique=True)
-    from_date = models.DateField()
-    to_date = models.DateField()
-    from_number = models.PositiveIntegerField()
-    to_number = models.PositiveIntegerField()
-    current_number = models.PositiveIntegerField(default=None)
-
-    class Meta:
-        ordering = ("-created_at",)
-
-    def save(self, *args, **kwargs):
-        if self.pk is None:  # se está creando un nuevo objeto
-            self.current_number = self.from_number
-        super().save(*args, **kwargs)
