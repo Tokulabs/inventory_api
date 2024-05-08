@@ -22,14 +22,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config("SECRET_KEY")
+SECRET_KEY = 'django-insecure-_a82_ddznls$4gc26^*s(fsxn7le7g2ko2(9_56*p@&bv3t-)z'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG")
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
-AUTH_USER_MODEL = "user_control.CustomUser"
+AUTH_USER_MODEL = 'user_control.CustomUser'
 
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'inventory_api.custom_methods.custom_exception_handler',
@@ -98,13 +98,6 @@ DATABASES = {
         'PORT': '5432',
     }
 }
-
-# Render PostgreSQL database (live)
-'''
-DATABASES = {
-    'default': dj_database_url.parse(config('DB_EXTERNAL_URL'))
-}
-'''
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
