@@ -97,17 +97,16 @@ def get_query(query_string, search_fields):
         return query
 
 
-def create_terminals_report(ws, report_data):
+def create_terminals_report(ws, report_data, start_date, end_date):
     if not report_data:
         return 3
 
-    current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted(set([item[1].upper() for item in report_data]))
     second_row_text = ["CANT", "DATAFONO"] + list(users) + ["TOTAL DIA"]
 
     # add report title and date and their styles
     ws['A1'] = "VENTA EN TARJETAS"
-    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + '1'] = current_date
+    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + '1'] = f'{start_date} A {end_date}'
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2 + len(users))
     apply_styles_to_cells(start_column=1, start_row=1, end_column=2 + len(users), end_row=1,
                           ws=ws, font=title_report_font, alignment=alignment, fill=title_report_fill)
@@ -182,18 +181,17 @@ def create_terminals_report(ws, report_data):
     return new_created_rows[-1] + 2
 
 
-def create_dollars_report(ws, report_data, last_row):
+def create_dollars_report(ws, report_data, last_row, start_date, end_date):
     if not report_data:
         return last_row + 1
 
     beginning_row = last_row + 1
-    current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted([item[0].upper() for item in report_data])
     second_row_text = ["CANT", "NOMBRE"] + users + ["TOTAL DIA"]
 
     # add report title and date
     ws[f'A{beginning_row}'] = "VENTAS EN DOLARES"
-    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + f'{beginning_row}'] = current_date
+    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + f'{beginning_row}'] = f'{start_date} A {end_date}'
     ws.merge_cells(start_row=beginning_row, start_column=1, end_row=beginning_row, end_column=2 + len(users))
 
     # apply styles to title and date
@@ -254,18 +252,18 @@ def create_dollars_report(ws, report_data, last_row):
     return beginning_row + 6
 
 
-def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_data, cards_report_data):
+def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_data, cards_report_data,
+                       start_date, end_date):
     if not report_data:
         return last_row + 1, last_row_cards + 1
 
     beginning_row = last_row + 1
-    current_date = datetime.now().strftime("%Y-%m-%d")
     users = sorted([item[0].upper() for item in report_data])
     second_row_text = ["ITEM", "NOMBRE"] + users + ["TOTAL DIA"]
 
     # add report title and date
     ws[f'A{beginning_row}'] = "VENTAS DIARIAS"
-    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + f'{beginning_row}'] = current_date
+    ws[get_column_letter(second_row_text.index("TOTAL DIA") + 1) + f'{beginning_row}'] = f'{start_date} A {end_date}'
     ws.merge_cells(start_row=beginning_row, start_column=1, end_row=beginning_row, end_column=2 + len(users))
 
     # apply styles to title and date
