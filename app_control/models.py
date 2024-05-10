@@ -97,6 +97,7 @@ class Inventory(models.Model):
         InventoryGroup, related_name="inventories", null=True, on_delete=models.SET_NULL
     )
     name = models.CharField(max_length=255)
+    cost_center = models.CharField(max_length=255, null=True)
     total_in_shops = models.PositiveIntegerField(default=0)
     total_in_storage = models.PositiveIntegerField(default=0)
     selling_price = models.FloatField(default=0)

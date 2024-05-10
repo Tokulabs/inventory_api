@@ -5,6 +5,7 @@ from .models import CustomUser, Roles, UserActivities
 class CreateUserSerializer(serializers.Serializer):
     email = serializers.EmailField()
     fullname = serializers.CharField()
+    document_id = serializers.CharField()
     role = serializers.ChoiceField(Roles)
 
 
