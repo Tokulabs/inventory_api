@@ -23,8 +23,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report
-from django.db.models import Count, Sum, F, Q, Value, CharField, Func
+    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, world_office_report
+from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef
 from django.db.models.functions import Coalesce, TruncMonth
 from user_control.models import CustomUser
 import csv
@@ -861,6 +861,64 @@ class InvoicesReportExporter(APIView):
         )
 
         create_invoices_report(ws, inventories_report_data)
+
+        wb.save(response)
+        return response
+
+class FacturaElectronicaExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="DocumentosVentasEncabezadosMovimientoInventarioWO.xlsx"'
+
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        if not start_date or not end_date:
+            return Response({"error": "You need to provide start_date and end_date"})
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "QueryDef_Exportar"
+
+        world_office_report_data = (
+            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .annotate(
+                total_invoice=Sum("invoice_items__amount"),
+                descuento=Func(
+                    F("invoice_items__discount") / 100.0,
+                    function='REPLACE',
+                    template="REPLACE(CAST(%(expressions)s AS VARCHAR), '.', ',')",
+                    output_field=CharField()
+                )
+            )
+            .annotate(
+                null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
+                empresa=ExpressionWrapper(Value('SIGNOS STUDIOS SAS'), output_field=CharField()),
+                tipo_doc=ExpressionWrapper(Value('FV'), output_field=CharField()),
+                prefijo=ExpressionWrapper(Value('SS'), output_field=CharField()),
+                doc_vendedor=ExpressionWrapper(Value('51023563'), output_field=CharField()),
+                nota=ExpressionWrapper(Value('FACTURA DE VENTA'), output_field=CharField()),
+                verificado=ExpressionWrapper(Value('0'), output_field=CharField()),
+                bodega=ExpressionWrapper(Value('GUASA'), output_field=CharField()),
+                medida=ExpressionWrapper(Value('Und.'), output_field=CharField()),
+                iva=ExpressionWrapper(Value('0,19'), output_field=CharField())
+            )
+            .values_list(
+                "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "payment_methods__name", "created_at__date",
+                "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "bodega", "medida",
+                "invoice_items__quantity", "iva", "invoice_items__item__selling_price", "descuento", "created_at__date", "invoice_items__item_name", "bodega",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value"
+            )
+        )
+
+        world_office_report(ws, world_office_report_data)
 
         wb.save(response)
         return response
