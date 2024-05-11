@@ -637,11 +637,11 @@ class ReportExporter(APIView):
     permission_classes = (IsAuthenticatedCustom,)
 
     def post(self, request):
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename="reporte_diario.xlsx"'
-
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="reporte_ventas_{start_date}_al_{end_date}.xlsx"'
 
         if not start_date or not end_date:
             return Response({"error": "You need to provide start_date and end_date"})
@@ -660,7 +660,7 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(payment_methods__name="creditCard")
+            .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("payment_terminal__name", "sale_by__fullname")
             .annotate(
                 quantity=Count("id"),
@@ -668,7 +668,7 @@ class ReportExporter(APIView):
             )
         )
 
-        last_row_cards = create_terminals_report(ws, terminals_report_data)
+        last_row_cards = create_terminals_report(ws, terminals_report_data, start_date, end_date)
 
         dollar_report_data = (
             Invoice.objects.select_related("InvoiceItems", "created_by")
@@ -682,7 +682,7 @@ class ReportExporter(APIView):
             )
         )
 
-        last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards)
+        last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards, start_date, end_date)
 
         cash_report_data = (
             Invoice.objects.select_related("InvoiceItems", "created_by")
@@ -712,7 +712,7 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(payment_methods__name="creditCard")
+            .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("sale_by__fullname")
             .annotate(
                 total=Sum("payment_methods__paid_amount")
@@ -720,7 +720,9 @@ class ReportExporter(APIView):
         )
 
         last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
-                                                   cash_report_data, dollar_report_data_in_pesos, cards_report_data)
+                                                   cash_report_data, dollar_report_data_in_pesos, cards_report_data,
+                                                   start_date, end_date
+                                                   )
 
         # center all text in the cells from A1 to the last cell
         apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
@@ -772,15 +774,15 @@ class ItemsReportExporter(APIView):
     permission_classes = (IsAuthenticatedCustom,)
 
     def post(self, request):
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename="reporte_ventas_x_producto.xlsx"'
+        response['Content-Disposition'] = f'attachment; filename="reporte_ventas_x_producto_{start_date}_{end_date}.xlsx"'
 
         wb = Workbook()
         ws = wb.active
         ws.title = "REPORTE DE VENTAS POR PRODUCTO"
-
-        start_date = request.data.get("start_date", None)
-        end_date = request.data.get("end_date", None)
 
         if not start_date or not end_date:
             return Response({"error": "You need to provide start_date and end_date"})
@@ -831,11 +833,10 @@ class InvoicesReportExporter(APIView):
     permission_classes = (IsAuthenticatedCustom,)
 
     def post(self, request):
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename="reporte_facturas.xlsx"'
-
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="reporte_facturas_{start_date}_{end_date}.xlsx"'
 
         if not start_date or not end_date:
             return Response({"error": "You need to provide start_date and end_date"})

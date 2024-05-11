@@ -29,6 +29,7 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     fullname = models.CharField(max_length=255)
+    document_id = models.CharField(max_length=255, null=False)
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=12, choices=Roles)
     created_at = models.DateTimeField(auto_now_add=True)
