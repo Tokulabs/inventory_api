@@ -49,4 +49,6 @@ urlpatterns = [
          PaymentTerminalView.as_view({'post': 'toggle_active'}), name='terminal-toggle'),
     path('dian-resolution/<int:pk>/toggle-active/',
          DianResolutionView.as_view({'post': 'toggle_active'}), name='resolution-toggle'),
+    path('group/<int:pk>/toggle-active/',
+         InventoryGroupView.as_view({'post': 'toggle_active'}), name='resolution-toggle'),
 ]
