@@ -253,7 +253,7 @@ def create_dollars_report(ws, report_data, last_row, start_date, end_date):
 
 
 def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_data, cards_report_data,
-                       start_date, end_date):
+                       transfers_report_data, start_date, end_date):
     if not report_data:
         return last_row + 1, last_row_cards + 1
 
@@ -301,7 +301,9 @@ def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_
     for item in cards_report_data:
         ws.cell(row=beginning_row + 4, column=second_row_text.index(item[0].upper()) + 1, value=item[1])
 
-    # add values to discount row
+    # add dynamic values based in the cards report data depending on amount of users
+    for item in transfers_report_data:
+        ws.cell(row=beginning_row + 5, column=second_row_text.index(item[0].upper()) + 1, value=item[1])
 
     # add subtotal formula
     total_formulas_last_row = []

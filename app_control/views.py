@@ -734,9 +734,21 @@ class ReportExporter(APIView):
             )
         )
 
+        transfers_report_data = (
+            Invoice.objects.select_related("PaymentMethods", "created_by")
+            .all()
+            .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+            .filter(is_override=False)
+            .filter(payment_methods__name__in=["nequi", "bankTransfer"])
+            .values_list("sale_by__fullname")
+            .annotate(
+                total=Sum("payment_methods__paid_amount")
+            )
+        )
+
         last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
                                                    cash_report_data, dollar_report_data_in_pesos, cards_report_data,
-                                                   start_date, end_date
+                                                    transfers_report_data, start_date, end_date
                                                    )
 
         # center all text in the cells from A1 to the last cell
