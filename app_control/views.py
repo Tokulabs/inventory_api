@@ -220,6 +220,21 @@ class InventoryGroupView(ModelViewSet):
         inventory_group.delete()
         return Response({"message": "Inventory Group deleted successfully"}, status=status.HTTP_200_OK)
 
+    def toggle_active(self, request, pk=None):
+        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        if inventory_group is None:
+            return Response({'error': 'Inventory Group not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not inventory_group.active == False:
+            for group in InventoryGroup.objects.filter(belongs_to_id=pk).all():
+                group.active = False
+                group.save()
+
+        inventory_group.active = not inventory_group.active
+        inventory_group.save()
+        serializer = self.serializer_class(inventory_group)
+        return Response(serializer.data)
+
 
 class PaymentTerminalView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
@@ -778,7 +793,8 @@ class ItemsReportExporter(APIView):
         end_date = request.data.get("end_date", None)
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="reporte_ventas_x_producto_{start_date}_{end_date}.xlsx"'
+        response[
+            'Content-Disposition'] = f'attachment; filename="reporte_ventas_x_producto_{start_date}_{end_date}.xlsx"'
 
         wb = Workbook()
         ws = wb.active

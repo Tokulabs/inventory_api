@@ -16,6 +16,7 @@ class InventoryGroup(models.Model):
         'self', null=True, on_delete=models.SET_NULL,
         related_name="group_relation"
     )
+    active = models.BooleanField(default=True, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
