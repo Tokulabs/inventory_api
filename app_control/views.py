@@ -745,6 +745,7 @@ class InventoriesReportExporter(APIView):
 
         inventories_report_data = (
             Inventory.objects.select_related("group")
+            .filter(active=True)
             .all()
             .annotate(
                 upper_group_name=Upper("group__belongs_to__name"),
