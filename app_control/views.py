@@ -894,7 +894,7 @@ class ElectronicInvoiceExporter(APIView):
         electronic_invoice_report_data = (
             Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems", "created_by")
             .all()
-            .filter(created_at__date__gte=start, created_at__date__lte=end)
+            .filter(created_at__range=(start, end))
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
             .annotate(
