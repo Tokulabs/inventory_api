@@ -3,7 +3,7 @@ from .views import (
     DianResolutionView, InventoryView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
-    InvoicesReportExporter, CustomerView, InvoicePainterView, FacturaElectronicaExporter
+    InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter
 )
 
 from rest_framework.routers import DefaultRouter
@@ -41,7 +41,7 @@ urlpatterns = [
     path('invoice/<int:pk>/', InvoiceView.as_view({'put': 'update', 'delete': 'destroy'}), name='invoice-detail'),
     path('product_sales_report_export/', ItemsReportExporter.as_view(), name='product_sales_report_export'),
     path('invoices_report_export/', InvoicesReportExporter.as_view(), name='invoices_report_export'),
-    path('factura_electronica_export/', FacturaElectronicaExporter.as_view(), name='factura_electronica_export'),
+    path('electronic_invoice_export/', ElectronicInvoiceExporter.as_view(), name='electronic_invoice_export'),
     path('inventory/<int:pk>/toggle-active/',
          InventoryView.as_view({'post': 'toggle_active'}), name='inventory-toggle'),
     path('provider/<int:pk>/toggle-active/',
