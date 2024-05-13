@@ -33,7 +33,7 @@ class CreateUserView(ModelViewSet):
         add_user_activity(request.user, "add new user")
 
         return Response(
-            {"success": "User Created Succesfully"},
+            {"success": "Usuario creado satisfactoriamente"},
             status=status.HTTP_201_CREATED
         )
 
@@ -59,9 +59,9 @@ class LoginView(ModelViewSet):
                 if not user.password:
                     return Response({"user_id": user.id})
                 else:
-                    raise Exception("User has password already")
+                    raise Exception("El usuario ya tiene contraseña")
             else:
-                raise Exception("User with email not found")
+                raise Exception("Email de usuario no encontrado")
 
         user = authenticate(
             username=valid_request.validated_data["email"],
@@ -70,7 +70,7 @@ class LoginView(ModelViewSet):
 
         if not user:
             return Response(
-                {"error": "Invalid email or password"},
+                {"error": "Email o contraseña invalidas"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -97,7 +97,7 @@ class UpdatePasswordView(ModelViewSet):
             id=valid_request.validated_data["user_id"])
 
         if not user:
-            raise Exception("User with id not found")
+            raise Exception("Id de usuario no encontrado")
 
         user = user[0]
 
@@ -106,7 +106,7 @@ class UpdatePasswordView(ModelViewSet):
 
         add_user_activity(user, "update password")
 
-        return Response({"success": "User password updated"})
+        return Response({"success": "Contraseña actualizada"})
 
 
 class MeView(ModelViewSet):
@@ -178,7 +178,7 @@ class UsersView(ModelViewSet):
     def toggle_is_active(self, request, pk=None):
         user = CustomUser.objects.filter(pk=pk).first()
         if user is None:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         user.is_active = not user.is_active
         user.save()
