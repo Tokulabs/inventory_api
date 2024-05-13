@@ -872,14 +872,14 @@ class ElectronicInvoiceExporter(APIView):
     
     def post(self, request):
         
-        start_date_str = request.data.get("start_date", None)
-        end_date_str = request.data.get("end_date", None)
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
 
-        start = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
-        end = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
+        start = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+        end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        file_name = 'formato_factura_electronica-'+ start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime("%Y-%m-%d_%H_%M_%S") + '.xlsx'
+        file_name = 'FormatoFacturaElectronica-'+ start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime("%Y-%m-%d_%H_%M_%S") + '.xlsx'
         print("Filename: ", file_name)
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
