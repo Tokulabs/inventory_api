@@ -75,12 +75,12 @@ class InventoryView(ModelViewSet):
     def destroy(self, request, pk=None):
         inventory = Inventory.objects.filter(pk=pk).first()
         inventory.delete()
-        return Response({"message": "Inventory deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Producto eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
         inventory = Inventory.objects.filter(pk=pk).first()
         if inventory is None:
-            return Response({'error': 'Inventory not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Producto no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         inventory.active = not inventory.active
         inventory.save()
@@ -125,12 +125,12 @@ class ProviderView(ModelViewSet):
     def destroy(self, request, pk):
         provider = Provider.objects.filter(pk=pk).first()
         provider.delete()
-        return Response({"message": "Provider deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Proveedor eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
         provider = Provider.objects.filter(pk=pk).first()
         if provider is None:
-            return Response({'error': 'Provider not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Proveedor no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         provider.active = not provider.active
         provider.save()
@@ -171,7 +171,7 @@ class CustomerView(ModelViewSet):
     def destroy(self, request, pk):
         customer = Customer.objects.filter(pk=pk).first()
         customer.delete()
-        return Response({"message": "Customer deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Cliente eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
 class InventoryGroupView(ModelViewSet):
@@ -218,12 +218,12 @@ class InventoryGroupView(ModelViewSet):
     def destroy(self, request, pk=None):
         inventory_group = InventoryGroup.objects.filter(pk=pk).first()
         inventory_group.delete()
-        return Response({"message": "Inventory Group deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Categoría eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
         inventory_group = InventoryGroup.objects.filter(pk=pk).first()
         if inventory_group is None:
-            return Response({'error': 'Inventory Group not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Categoría no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
         if not inventory_group.active == False:
             for group in InventoryGroup.objects.filter(belongs_to_id=pk).all():
@@ -276,12 +276,12 @@ class PaymentTerminalView(ModelViewSet):
     def destroy(self, request, pk=None):
         terminal = PaymentTerminal.objects.filter(pk=pk).first()
         terminal.delete()
-        return Response({"message": "Payment Terminal deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Datafono eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
         terminal = PaymentTerminal.objects.filter(pk=pk).first()
         if terminal is None:
-            return Response({'error': 'Payment Terminal not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Datafono no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         terminal.active = not terminal.active
         terminal.save()
@@ -319,7 +319,7 @@ class InvoiceView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         dian_resolution = DianResolution.objects.filter(active=True).first()
         if not dian_resolution:
-            raise Exception("You need to have an active dian resolution to create invoices")
+            raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
 
         try:
             if not request.data.get("sale_by_id"):
@@ -351,7 +351,7 @@ class InvoiceView(ModelViewSet):
     def destroy(self, request, pk=None):
         invoice = Invoice.objects.filter(pk=pk).first()
         invoice.delete()
-        return Response({"message": "Invoice deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Factura eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
 class UpdateInvoiceView(APIView):
@@ -359,10 +359,10 @@ class UpdateInvoiceView(APIView):
         try:
             invoice = Invoice.objects.get(invoice_number=invoice_number)
         except Invoice.DoesNotExist:
-            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Factura no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
         if invoice.is_override:
-            return Response({"error": "Invoice already overrided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "La Factura ya está anulada"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Actualizar el estado is_override de la factura a True
         invoice.is_override = True
@@ -376,7 +376,7 @@ class UpdateInvoiceView(APIView):
         # Guardar los cambios en la base de datos
         invoice.save()
 
-        return Response({"message": "Invoice updated successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Factura actualizada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
 class SummaryView(ModelViewSet):
@@ -405,14 +405,14 @@ class InvoicePainterView(ModelViewSet):
     def list(self, request, *args, **kwargs):
         invoice_number = request.query_params.get("invoice_number", None)
         if not id:
-            return Response({"error": "You need to provide invoice id"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Debe ingresar un número de factura"}, status=status.HTTP_400_BAD_REQUEST)
         else:
             invoice = Invoice.objects.select_related(
                 "payment_terminal", "created_by"
             ).filter(invoice_number=invoice_number).first()
 
             if not invoice:
-                return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "Factura no encontrada"}, status=status.HTTP_404_NOT_FOUND)
             else:
                 return Response(InvoiceSerializer(invoice).data)
 
@@ -538,7 +538,7 @@ class InventoryCSVLoaderView(ModelViewSet):
         try:
             data = request.FILES['data']
         except Exception as e:
-            raise Exception("you need to provide inventory CSV data")
+            raise Exception("Debe ingresar los productos en un archivo CSV")
 
         inventory_items = []
 
@@ -566,7 +566,7 @@ class InventoryCSVLoaderView(ModelViewSet):
             raise Exception(e)
 
         if not inventory_items:
-            raise Exception("CSV file cannot be empty")
+            raise Exception("El archivo CSV no puede estar vacío")
 
         data_validation = self.serializer_class(
             data=inventory_items, many=True)
@@ -574,7 +574,7 @@ class InventoryCSVLoaderView(ModelViewSet):
         data_validation.save()
 
         return Response({
-            "success": "Inventory items added successfully"
+            "success": "Productos creados satisfactoriamente"
         })
 
 
@@ -608,8 +608,8 @@ class DianResolutionView(ModelViewSet):
         request.data.update({"created_by_id": request.user.id})
 
         if DianResolution.objects.all().filter(active=True).exists():
-            raise Exception("You can't have more than one active dian resolution, "
-                            "please deactivate the current one first")
+            raise Exception("No puede tener más de una Resolución de la DIAN activa, "
+                            "por favor, desactive primero la actual")
 
         return super().create(request, *args, **kwargs)
 
@@ -619,8 +619,8 @@ class DianResolutionView(ModelViewSet):
 
         if request.data.get("active", True) is True:
             if DianResolution.objects.all().filter(active=True).exists():
-                raise Exception("You can't have more than one active dian resolution, "
-                                "please deactivate the current one first")
+                raise Exception("No puede tener más de una Resolución de la DIAN activa, "
+                                "por favor, desactive primero la actual")
 
         if serializer.is_valid():
             serializer.save()
@@ -630,16 +630,16 @@ class DianResolutionView(ModelViewSet):
     def destroy(self, request, pk=None):
         dian_res = DianResolution.objects.filter(pk=pk).first()
         dian_res.delete()
-        return Response({"message": "Dian Resolution deleted successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "Resolución DIAN eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
         resolution = DianResolution.objects.filter(pk=pk).first()
         if resolution is None:
-            return Response({'error': 'Dian Resolution not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Resolución DIAN no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
         if DianResolution.objects.all().filter(active=True).exists() and resolution.active is False:
-            raise Exception("You can't have more than one active dian resolution, "
-                            "please deactivate the current one first")
+            raise Exception("No puede tener más de una Resolución de la DIAN activa, "
+                            "por favor, desactive primero la actual")
 
         resolution.active = not resolution.active
         resolution.save()
@@ -659,7 +659,7 @@ class ReportExporter(APIView):
         response['Content-Disposition'] = f'attachment; filename="reporte_ventas_{start_date}_al_{end_date}.xlsx"'
 
         if not start_date or not end_date:
-            return Response({"error": "You need to provide start_date and end_date"})
+            return Response({"error": "Debe ingresar un rango de fechas"})
 
         # cast start_date and end_date to datetime
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -814,7 +814,7 @@ class ItemsReportExporter(APIView):
         ws.title = "REPORTE DE VENTAS POR PRODUCTO"
 
         if not start_date or not end_date:
-            return Response({"error": "You need to provide start_date and end_date"})
+            return Response({"error": "Debe ingresar un rango de fechas"})
 
         report_data = (
             Invoice.objects.select_related("InvoiceItems")
@@ -868,7 +868,7 @@ class InvoicesReportExporter(APIView):
         response['Content-Disposition'] = f'attachment; filename="reporte_facturas_{start_date}_{end_date}.xlsx"'
 
         if not start_date or not end_date:
-            return Response({"error": "You need to provide start_date and end_date"})
+            return Response({"error": "Debe ingresar un rango de fechas"})
 
         wb = Workbook()
         ws = wb.active
