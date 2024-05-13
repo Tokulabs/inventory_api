@@ -89,18 +89,6 @@ WSGI_APPLICATION = 'inventory_api.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
-'''
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'signos',
-        'USER': 'dbadmin',
-        'PASSWORD': 'refocus-repost-plausibly',
-        'HOST': 'signos-db.c1go6ewmy4g0.us-east-1.rds.amazonaws.com',
-        'PORT': '5432',
-    }
-}
-'''
 
 DATABASES = {
     'default': {
@@ -112,7 +100,6 @@ DATABASES = {
         'PORT': config('DB_PORT')
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
