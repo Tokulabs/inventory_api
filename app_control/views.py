@@ -667,7 +667,6 @@ class ReportExporter(APIView):
         if not start_date or not end_date:
             return Response({"error": "You need to provide start_date and end_date"})
 
-        # cast start_date and end_date to datetime
         start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
 
@@ -757,7 +756,6 @@ class ReportExporter(APIView):
                                                    transfers_report_data, start_date, end_date
                                                    )
 
-        # center all text in the cells from A1 to the last cell
         apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
 
         wb.save(response)

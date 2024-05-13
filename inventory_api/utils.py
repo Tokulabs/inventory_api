@@ -226,7 +226,7 @@ def create_dollars_report(ws, report_data, last_row, start_date, end_date):
     for index, user in enumerate(second_row_text[2:], start=2):
         start_column = index + 1
         total_formulas_last_row.append(
-            sum_formula_text(beginning_row + 2, beginning_row + 4, start_column, start_column))
+            f"={get_column_letter(start_column)}{beginning_row + 2}-{get_column_letter(start_column)}{beginning_row + 3}+{get_column_letter(start_column)}{beginning_row + 4}")
     add_values_to_row_multiple_columns(3, beginning_row + 5, total_formulas_last_row, ws)
 
     # apply styles to totals row
