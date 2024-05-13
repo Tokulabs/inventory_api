@@ -222,8 +222,14 @@ class InventoryGroupView(ModelViewSet):
 
     def toggle_active(self, request, pk=None):
         inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+
         if inventory_group is None:
-            return Response({'error': 'Inventory Group not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Categoria no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        if inventory_group.belongs_to is not None:
+            inventory_group_father = InventoryGroup.objects.filter(pk=inventory_group.belongs_to_id).first()
+            if inventory_group_father.active == False:
+                return Response({'error': 'Categoria padre no está activa'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not inventory_group.active == False:
             for group in InventoryGroup.objects.filter(belongs_to_id=pk).all():
@@ -748,7 +754,7 @@ class ReportExporter(APIView):
 
         last_row, last_column = create_cash_report(ws, last_row_dollars, last_row_cards,
                                                    cash_report_data, dollar_report_data_in_pesos, cards_report_data,
-                                                    transfers_report_data, start_date, end_date
+                                                   transfers_report_data, start_date, end_date
                                                    )
 
         # center all text in the cells from A1 to the last cell
