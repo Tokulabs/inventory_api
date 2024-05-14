@@ -76,7 +76,7 @@ class LoginView(ModelViewSet):
 
         access = get_access_token({"user_id": user.id}, 1)
 
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now()
         user.save()
 
         add_user_activity(user, "logged in")
