@@ -393,9 +393,9 @@ class SummaryView(ModelViewSet):
     def list(self, request, *args, **kwargs):
         total_inventory = InventoryView.queryset.filter(
             total_in_storage__gt=0
-        ).count()
-        total_group = InventoryGroupView.queryset.count()
-        total_users = CustomUser.objects.filter(is_superuser=False).count()
+        ).filter(active=True).count()
+        total_group = InventoryGroupView.queryset.filter(active=True).count()
+        total_users = CustomUser.objects.filter(is_superuser=False).filter(is_active=True).count()
 
         return Response({
             "total_inventory": total_inventory,
@@ -512,17 +512,20 @@ class PurchaseView(ModelViewSet):
 
         results = query.aggregate(
             amount_total=Sum(F('amount')),
-            total=Sum('quantity'),
+            total=Coalesce(Sum(F('quantity'), filter=Q(is_gift=False)), 0),
+            gift_total=Coalesce(Sum(F('quantity'), filter=Q(is_gift=True)), 0),
             amount_total_usd=Sum(F('usd_amount'),
                                  filter=Q(invoice__is_dollar=True, invoice__is_override=False))
         )
 
         selling_price = results.get("amount_total", 0.0)
         count = results.get("total", 0)
+        gift_count = results.get("gift_total", 0)
         price_dolar = results.get("amount_total_usd", 0.0)
 
         response_data = {
             "count": count,
+            "gift_count": gift_count
         }
 
         if selling_price is not None:
@@ -595,11 +598,18 @@ class DianResolutionView(ModelViewSet):
         if self.request.method.lower() != 'get':
             return self.queryset
 
+        current_resolution = self.queryset.filter(active=True).first()
+
+        if current_resolution.to_date < date.today():
+            current_resolution.active = False
+            current_resolution.save()
+
+        query_set = DianResolution.objects.all()
         data = self.request.query_params.dict()
         data.pop("page", None)
         keyword = data.pop("keyword", None)
 
-        results = self.queryset.filter(**data)
+        results = query_set.filter(**data)
 
         if keyword:
             search_fields = (
@@ -646,6 +656,9 @@ class DianResolutionView(ModelViewSet):
         if DianResolution.objects.all().filter(active=True).exists() and resolution.active is False:
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
+
+        if resolution.to_date < date.today():
+            raise Exception("No se puede activar una resolución despues de su fecha limite")
 
         resolution.active = not resolution.active
         resolution.save()
