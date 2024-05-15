@@ -600,7 +600,7 @@ class DianResolutionView(ModelViewSet):
 
         current_resolution = self.queryset.filter(active=True).first()
 
-        if current_resolution.to_date < date.today():
+        if current_resolution is not None and current_resolution.to_date < date.today():
             current_resolution.active = False
             current_resolution.save()
 
