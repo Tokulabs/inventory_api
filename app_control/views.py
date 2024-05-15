@@ -633,7 +633,9 @@ class DianResolutionView(ModelViewSet):
         dian_res = DianResolution.objects.filter(pk=pk).first()
         serializer = self.serializer_class(dian_res, data=request.data)
 
-        if request.data.get("active", True) is True:
+        print(request.data.get)
+
+        if request.data.get("active") is not None and request.data.get("active", True) is True:
             if DianResolution.objects.all().filter(active=True).exists():
                 raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                                 "por favor, desactive primero la actual")
