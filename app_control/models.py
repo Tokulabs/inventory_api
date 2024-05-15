@@ -175,7 +175,7 @@ class PaymentTerminal(models.Model):
         CustomUser, null=True, related_name="payment_terminals",
         on_delete=models.SET_NULL
     )
-    account_code = models.CharField(max_length=200, unique=True)
+    account_code = models.CharField(max_length=200)
     name = models.CharField(max_length=100, unique=True)
     is_wireless = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
