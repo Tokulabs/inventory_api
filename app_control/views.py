@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta, date
+from decimal import Decimal
 
 from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond
 from django.db.models.functions.text import Upper
@@ -23,9 +24,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report
-from django.db.models import Count, Sum, F, Q, Value, CharField, Func
-from django.db.models.functions import Coalesce, TruncMonth
+    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, electronic_invoice_report
+from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, DecimalField, IntegerField
+from django.db.models.functions import Coalesce, TruncMonth, Cast
 from user_control.models import CustomUser
 import csv
 import codecs
@@ -906,6 +907,69 @@ class InvoicesReportExporter(APIView):
         )
 
         create_invoices_report(ws, inventories_report_data)
+
+        wb.save(response)
+        return response
+
+class ElectronicInvoiceExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+    
+    def post(self, request):
+        
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        start = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+        end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        file_name = 'FormatoFacturaElectronica-'+ start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime("%Y-%m-%d_%H_%M_%S") + '.xlsx'
+        print("Filename: ", file_name)
+
+        response['Content-Disposition'] = 'attachment; filename=' + file_name
+
+        if not start_date or not end_date:
+            return Response({"error": "You need to provide start_date and end_date"})
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "QueryDef_Exportar"
+
+        electronic_invoice_report_data = (
+            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems", "created_by")
+            .all()
+            .filter(created_at__range=(start, end))
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
+            .annotate(
+                total_invoice=Sum("invoice_items__amount"),
+                descuento=ExpressionWrapper(
+                    F("invoice_items__discount") / 100.0, output_field=DecimalField(decimal_places=2)
+                )                
+            )
+            .annotate(
+                null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
+                empresa=ExpressionWrapper(Value('SIGNOS STUDIOS SAS'), output_field=CharField()),
+                tipo_doc=ExpressionWrapper(Value('FV'), output_field=CharField()),
+                prefijo=ExpressionWrapper(Value('SS'), output_field=CharField()),
+                doc_vendedor=ExpressionWrapper(Value('51023563'), output_field=CharField()),
+                nota=ExpressionWrapper(Value('FACTURA DE VENTA'), output_field=CharField()),
+                verificado=Value(0, output_field=IntegerField()),
+                bodega=ExpressionWrapper(Value('GUASA'), output_field=CharField()),
+                medida=ExpressionWrapper(Value('Und.'), output_field=CharField()),
+                iva=Value(Decimal('0.19'), output_field=DecimalField())
+            )
+            .values_list(
+                "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "payment_methods__name", "created_at__date",
+                "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "bodega", "medida",
+                "invoice_items__quantity", "iva", "invoice_items__item__selling_price", "descuento", "created_at__date", "invoice_items__item_name", "bodega",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value"
+            )
+        )
+
+        electronic_invoice_report(ws, electronic_invoice_report_data)
 
         wb.save(response)
         return response
