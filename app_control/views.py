@@ -391,9 +391,7 @@ class SummaryView(ModelViewSet):
     queryset = InventoryView.queryset
 
     def list(self, request, *args, **kwargs):
-        total_inventory = InventoryView.queryset.filter(
-            total_in_storage__gt=0
-        ).filter(active=True).count()
+        total_inventory = InventoryView.queryset.filter(active=True).count()
         total_group = InventoryGroupView.queryset.filter(active=True).count()
         total_users = CustomUser.objects.filter(is_superuser=False).filter(is_active=True).count()
 
