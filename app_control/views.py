@@ -510,17 +510,19 @@ class PurchaseView(ModelViewSet):
             query = query.exclude(invoice__is_override=True)
 
         results = query.aggregate(
-            amount_total=Sum(F('amount')),
+            amount_total_no_gifts=Sum(F('amount'), filter=Q(is_gift=False)),
             total=Coalesce(Sum(F('quantity'), filter=Q(is_gift=False)), 0),
             gift_total=Coalesce(Sum(F('quantity'), filter=Q(is_gift=True)), 0),
             amount_total_usd=Sum(F('usd_amount'),
-                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False))
+                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False)),
+            amount_total_gifts=Sum(F('amount'), filter=Q(is_gift=True))
         )
 
-        selling_price = results.get("amount_total", 0.0)
+        selling_price = results.get("amount_total_no_gifts", 0.0)
         count = results.get("total", 0)
         gift_count = results.get("gift_total", 0)
         price_dolar = results.get("amount_total_usd", 0.0)
+        selling_price_gifts = results.get("amount_total_gifts", 0.0)
 
         response_data = {
             "count": count,
@@ -529,6 +531,9 @@ class PurchaseView(ModelViewSet):
 
         if selling_price is not None:
             response_data["selling_price"] = "{:.2f}".format(selling_price)
+        
+        if selling_price_gifts is not None:
+            response_data["selling_price_gifts"] = "{:.2f}".format(selling_price_gifts)
 
         if price_dolar is not None:
             response_data["price_dolar"] = "{:.2f}".format(price_dolar)
