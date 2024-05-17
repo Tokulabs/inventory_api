@@ -492,3 +492,36 @@ def create_invoices_report(ws, report_data):
     # apply english accounting format to all columns from 6 to 11
     for row in range(2, len(report_data) + 2):
         ws[f"{get_column_letter(6)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
+
+def electronic_invoice_report(ws, report_data):
+    column_titles = ["Empresa","Tipo Documento","prefijo","DocumentoNúmero","Fecha","Tercero Interno","Tercero Externo","Nota",
+                  "FormaDePago","FechaEntrega","DocExternoPrefijo","NúmDocumentoExterno","Verificado","Anulado","Personalizado1",
+                  "Personalizado2","Personalizado3","Personalizado4","Personalizado5","Personalizado6","Personalizado7","Personalizado8",
+                  "Personalizado9","Personalizado10","Personalizado11","Personalizado12","Personalizado13","Personalizado14","Personalizado15",
+                  "Sucursal","Clasificación","Producto","Bodega","UnidadDeMedida","Cantidad","Iva","Valor","Descuento","Vencimiento","Nota Detalle",
+                  "Centro Costos","Personalizado1Det","Personalizado2Det","Personalizado3Det","Personalizado4Det","Personalizado5Det","Personalizado6Det",
+                  "Personalizado7Det","Personalizado8Det","Personalizado9Det","Personalizado10Det","Personalizado11Det","Personalizado12Det","Personalizado13Det","Personalizado14Det","Personalizado15Det"]
+    add_values_to_row_multiple_columns(1, 1, column_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(column_titles), end_row=1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
+    for column in range(1, 50):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+
+    for row_idx, row_data in enumerate(report_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    # apply english accounting format to all columns from 6 to 11
+    for column in [5, 10, 39]:
+        for cell in ws[get_column_letter(column)]:
+            cell.number_format = "DD/MM/YYYY"
+    
+    for cell in ws[get_column_letter(38)]:
+        cell.number_format = '0.00'
+
+    """ for cell in ws[get_column_letter(10)]:
+        cell.number_format = "DD/MM/YYYY"
+    
+    for cell in ws[get_column_letter(39)]:
+        cell.number_format = "DD/MM/YYYY" """
+    
