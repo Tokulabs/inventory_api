@@ -375,14 +375,15 @@ class InvoiceSimpleListView(ModelViewSet):
 
         keyword = data.pop("keyword", None)
         results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
-                                                 ).prefetch_related("invoice_items", "payment_methods").filter(**data)
+                                                 ).prefetch_related("invoice_items", "payment_methods"
+                                                                    ).filter(**data).filter(invoice_items__is_gift=False)
 
         if keyword:
             search_fields = (
                 "created_by__fullname", "created_by__email", "invoice_number", "dian_resolution__document_number",
             )
             query = get_query(keyword, search_fields)
-            results = results.filter(query).filter(invoice_items__is_gift=False)
+            results = results.filter(query)
 
         return results.annotate(
                 total_sum=Sum("invoice_items__amount"),
