@@ -18,7 +18,7 @@ from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, InventoryWithSumSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer
+    CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -361,6 +361,36 @@ class InvoiceView(ModelViewSet):
         return Response({"message": "Factura eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
+class InvoiceSimpleListView(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+    serializer_class = InvoiceSimpleSerializer
+    queryset = Invoice.objects.select_related(
+        "created_by", "sale_by", "payment_terminal", "dian_resolution").prefetch_related("invoice_items")
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+
+        keyword = data.pop("keyword", None)
+        results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
+                                                 ).prefetch_related("invoice_items", "payment_methods"
+                                                                    ).filter(**data).filter(invoice_items__is_gift=False)
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "invoice_number", "dian_resolution__document_number",
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+
+        return results.annotate(
+                total_sum=Sum("invoice_items__amount"),
+                total_sum_usd=Sum("invoice_items__usd_amount")
+            ).order_by('id')
+
+
 class UpdateInvoiceView(APIView):
     def patch(self, request, invoice_number):
         try:
@@ -697,6 +727,7 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("payment_terminal__name", "sale_by__fullname")
             .annotate(
@@ -712,7 +743,7 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(is_dollar=True)
+            .filter(is_dollar=True).filter(invoice_items__is_gift=False)
             .values_list("sale_by__fullname")
             .annotate(
                 quantity=Sum("invoice_items__usd_amount")
@@ -725,6 +756,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .values_list("sale_by__fullname")
             .annotate(
@@ -736,7 +768,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False)
+            .filter(is_override=False).filter(invoice_items__is_gift=False)
             .filter(is_dollar=True)
             .values_list("sale_by__fullname")
             .annotate(
@@ -748,7 +780,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False)
+            .filter(is_override=False).filter(invoice_items__is_gift=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("sale_by__fullname")
             .annotate(
@@ -760,7 +792,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False)
+            .filter(is_override=False).filter(invoice_items__is_gift=False)
             .filter(payment_methods__name__in=["nequi", "bankTransfer"])
             .values_list("sale_by__fullname")
             .annotate(
