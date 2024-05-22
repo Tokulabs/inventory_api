@@ -388,7 +388,7 @@ class InvoiceSimpleListView(ModelViewSet):
         return results.annotate(
                 total_sum=Sum("invoice_items__amount"),
                 total_sum_usd=Sum("invoice_items__usd_amount")
-            ).order_by('id')
+            ).order_by('-id')
 
 
 class UpdateInvoiceView(APIView):
@@ -443,7 +443,7 @@ class InvoicePainterView(ModelViewSet):
             return Response({"error": "Debe ingresar un número de factura"}, status=status.HTTP_400_BAD_REQUEST)
         else:
             invoice = Invoice.objects.select_related(
-                "payment_terminal", "created_by"
+                "payment_terminal", "created_by",
             ).filter(invoice_number=invoice_number).first()
 
             if not invoice:
