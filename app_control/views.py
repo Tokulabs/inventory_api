@@ -18,7 +18,7 @@ from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, InventoryWithSumSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer
+    CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -359,6 +359,35 @@ class InvoiceView(ModelViewSet):
         invoice = Invoice.objects.filter(pk=pk).first()
         invoice.delete()
         return Response({"message": "Factura eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
+
+
+class InvoiceSimpleListView(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+    serializer_class = InvoiceSimpleSerializer
+    queryset = Invoice.objects.select_related(
+        "created_by", "sale_by", "payment_terminal", "dian_resolution").prefetch_related("invoice_items")
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+
+        keyword = data.pop("keyword", None)
+        results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
+                                                 ).prefetch_related("invoice_items", "payment_methods").filter(**data)
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "invoice_number", "dian_resolution__document_number",
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query).filter(invoice_items__is_gift=False)
+
+        return results.annotate(
+                total_sum=Sum("invoice_items__amount"),
+                total_sum_usd=Sum("invoice_items__usd_amount")
+            ).order_by('id')
 
 
 class UpdateInvoiceView(APIView):
