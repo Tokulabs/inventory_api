@@ -388,7 +388,7 @@ class InvoiceSimpleListView(ModelViewSet):
         return results.annotate(
                 total_sum=Sum("invoice_items__amount"),
                 total_sum_usd=Sum("invoice_items__usd_amount")
-            ).order_by('id')
+            ).order_by('-id')
 
 
 class UpdateInvoiceView(APIView):
