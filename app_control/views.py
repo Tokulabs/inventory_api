@@ -727,7 +727,6 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(invoice_items__is_gift=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("payment_terminal__name", "sale_by__fullname")
             .annotate(
@@ -743,7 +742,8 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(is_dollar=True).filter(invoice_items__is_gift=False)
+            .filter(is_dollar=True)
+            .filter(invoice_items__is_gift=False)
             .values_list("sale_by__fullname")
             .annotate(
                 quantity=Sum("invoice_items__usd_amount")
@@ -768,7 +768,8 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False).filter(invoice_items__is_gift=False)
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .filter(is_dollar=True)
             .values_list("sale_by__fullname")
             .annotate(
@@ -780,7 +781,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False).filter(invoice_items__is_gift=False)
+            .filter(is_override=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("sale_by__fullname")
             .annotate(
@@ -792,7 +793,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False).filter(invoice_items__is_gift=False)
+            .filter(is_override=False)
             .filter(payment_methods__name__in=["nequi", "bankTransfer"])
             .values_list("sale_by__fullname")
             .annotate(
