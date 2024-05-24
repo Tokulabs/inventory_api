@@ -754,7 +754,7 @@ class ReportExporter(APIView):
         cash_report_data = (
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
-            .filter(is_override=False)
+            .filter(is_override=False).filter(invoice_items__is_gift=False)
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .values_list("sale_by__fullname")
             .annotate(
