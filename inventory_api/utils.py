@@ -130,10 +130,10 @@ def create_terminals_report(ws, report_data, start_date, end_date):
             ws.cell(row=row_idx, column=2, value=item[0].upper())
             ws.cell(row=row_idx, column=second_row_text.index(item[1].upper()) + 1, value=item[3])
             created_rows += 1
+            terminals_drawn[item[0]] = row_idx
         else:
             ws.cell(row=terminals_drawn[item[0]], column=second_row_text.index(item[1].upper()) + 1, value=item[3])
             updated_rows.append(row_idx)
-        terminals_drawn[item[0]] = row_idx
 
     # delete rows that were updated
     updated_rows.sort(reverse=True)
