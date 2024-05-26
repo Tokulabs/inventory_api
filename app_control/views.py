@@ -531,7 +531,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             for i in range(7):
                 date_begin = datetime.now() - timedelta(days=i)
                 day = f'{date_begin.day}/{date_begin.month}'
-                days.append({'day': day, 'total_quantity': 0})
+                days.append({'day': day, 'total_amount': 0})
 
             days.reverse()
 
@@ -569,7 +569,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             for i in range(5):
                 date_begin = datetime.now() - timedelta(weeks=i)
                 week_number = f"Week {date_begin.strftime('%V')}"
-                weeks.append({'week_number': week_number, 'total_quantity': 0})
+                weeks.append({'week_number': week_number, 'total_amount': 0})
 
             weeks.reverse()
 
@@ -598,6 +598,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
                     week['total_amount'] = sales_dict[week['week_number']]
 
             return Response(weeks)
+
         elif timeframe == 'monthly':
             months = []
             month_names = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre',
@@ -607,7 +608,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             for i in range(1, 13):
                 date_begin = datetime(current_year, i, 1)
                 month_name = month_names[date_begin.month - 1]
-                months.append({'month': month_name, 'total_quantity': 0})
+                months.append({'month': month_name, 'total_amount': 0})
 
             data = (
                 Invoice.objects.all()
