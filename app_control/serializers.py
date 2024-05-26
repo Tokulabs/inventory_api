@@ -56,6 +56,11 @@ class UserWithAmountSerializer(serializers.Serializer):
     total_invoice = serializers.FloatField()
 
 
+class HourlyQuantitiesSerializer(serializers.Serializer):
+    time = serializers.IntegerField()
+    total_quantity = serializers.IntegerField()
+
+
 class CustomerSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)

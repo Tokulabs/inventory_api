@@ -1,8 +1,8 @@
 import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-
-from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond
+from django.utils import timezone
+from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour
 from django.db.models.functions.text import Upper
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
@@ -18,7 +18,7 @@ from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, InventoryWithSumSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer, InvoiceSimpleSerializer
+    CustomerSerializer, InvoiceSimpleSerializer, HourlyQuantitiesSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -477,8 +477,41 @@ class SalePerformance(ModelViewSet):
             )
         ).order_by('-sum_of_item')[0:10]
 
+        print(items)
+
         response_data = InventoryWithSumSerializer(items, many=True).data
         return Response(response_data)
+
+
+class HourlySalesQuantities(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def list(self, request, *args, **kwargs):
+        hours = [{'time': hour, 'total_quantity': 0} for hour in range(24)]
+
+        data = (
+            Invoice.objects.all()
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
+            .filter(created_at__gte=datetime.now().date())
+            .annotate(
+                time=ExtractHour('created_at')
+            ).values(
+                'time'
+            ).annotate(
+                total_quantity=Sum('invoice_items__quantity')
+            ).order_by('time')
+        )
+
+        sales_dict = {item['time']: item['total_quantity'] for item in data}
+
+        # Update the hours list with sales data
+        for hour in hours:
+            if hour['time'] in sales_dict:
+                hour['total_quantity'] = sales_dict[hour['time']]
+
+        return Response(hours)
 
 
 class SalesByUsersView(ModelViewSet):
@@ -515,6 +548,8 @@ class SalesByUsersView(ModelViewSet):
                     total_invoice=Sum("invoice_items__amount"),
                 )
             )
+
+        print(sales_by_user)
 
         return Response(sales_by_user)
 
