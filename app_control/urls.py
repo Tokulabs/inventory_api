@@ -4,7 +4,7 @@ from .views import (
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
     InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter, InvoiceSimpleListView,
-    HourlySalesQuantities
+    HourlySalesQuantities, SalesBySelectedTimeframeSummary
 )
 
 from rest_framework.routers import DefaultRouter
@@ -26,6 +26,7 @@ router.register('sales-by-user', SalesByUsersView, "sales-by-user")
 router.register('customer', CustomerView, "customer")
 router.register('invoice-simple-list', InvoiceSimpleListView, "invoice-simple-list")
 router.register('hourly-quantities', HourlySalesQuantities, "hourly-quantities")
+router.register('sales-by-timeframe', SalesBySelectedTimeframeSummary, "sales-by-timeframe")
 
 urlpatterns = [
     path("", include(router.urls)),

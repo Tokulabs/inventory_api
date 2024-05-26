@@ -2,14 +2,16 @@ import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from django.utils import timezone
-from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour
-from django.db.models.functions.text import Upper
+from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour, \
+    ExtractDay, ExtractMonth, ExtractWeek
+from django.db.models.functions.text import Upper, Concat
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
 from openpyxl.utils import get_column_letter
 
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
+from sqlparse.sql import Case
 
 from app_control.models import DianResolution, PaymentTerminal, Provider, Customer
 from inventory_api.excel_manager import apply_styles_to_cells
@@ -18,14 +20,16 @@ from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, InventoryWithSumSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer, InvoiceSimpleSerializer, HourlyQuantitiesSerializer
+    CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, electronic_invoice_report
-from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, DecimalField, IntegerField
+    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
+    electronic_invoice_report
+from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
+    DecimalField, IntegerField, When
 from django.db.models.functions import Coalesce, TruncMonth, Cast
 from user_control.models import CustomUser
 import csv
@@ -376,7 +380,8 @@ class InvoiceSimpleListView(ModelViewSet):
         keyword = data.pop("keyword", None)
         results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
                                                  ).prefetch_related("invoice_items", "payment_methods"
-                                                                    ).filter(**data).filter(invoice_items__is_gift=False)
+                                                                    ).filter(**data).filter(
+            invoice_items__is_gift=False)
 
         if keyword:
             search_fields = (
@@ -386,9 +391,9 @@ class InvoiceSimpleListView(ModelViewSet):
             results = results.filter(query)
 
         return results.annotate(
-                total_sum=Sum("invoice_items__amount"),
-                total_sum_usd=Sum("invoice_items__usd_amount")
-            ).order_by('-created_at')
+            total_sum=Sum("invoice_items__amount"),
+            total_sum_usd=Sum("invoice_items__usd_amount")
+        ).order_by('-created_at')
 
 
 class UpdateInvoiceView(APIView):
@@ -514,6 +519,122 @@ class HourlySalesQuantities(ModelViewSet):
         return Response(hours)
 
 
+class SalesBySelectedTimeframeSummary(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def list(self, request, *args, **kwargs):
+        timeframe = request.GET.get('type', None)
+
+        if timeframe == 'daily':
+            days = []
+            for i in range(7):
+                date_begin = datetime.now() - timedelta(days=i)
+                day = f'{date_begin.day}/{date_begin.month}'
+                days.append({'day': day, 'total_quantity': 0})
+
+            days.reverse()
+
+            data = (
+                Invoice.objects.all()
+                .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
+                .filter(created_at__gte=datetime.now().date() - timedelta(days=7))
+                .annotate(
+                    day=Concat(
+                        ExtractDay('created_at'),
+                        Value('/'),
+                        ExtractMonth('created_at'),
+                        output_field=CharField()
+                    )
+                ).values(
+                    'day'
+                ).annotate(
+                    total_amount=Sum('invoice_items__amount')
+                ).order_by('day')
+            )
+
+            sales_dict = {item['day']: item['total_amount'] for item in data}
+
+            print(sales_dict)
+
+            for day in days:
+                if day['day'] in sales_dict:
+                    day['total_amount'] = sales_dict[day['day']]
+
+            return Response(days)
+
+        elif timeframe == 'weekly':
+            weeks = []
+            for i in range(5):
+                date_begin = datetime.now() - timedelta(weeks=i)
+                week_number = f"Week {date_begin.strftime('%V')}"
+                weeks.append({'week_number': week_number, 'total_quantity': 0})
+
+            weeks.reverse()
+
+            data = (
+                Invoice.objects.all()
+                .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
+                .filter(created_at__gte=datetime.now().date() - timedelta(weeks=5))
+                .annotate(
+                    week_number=Concat(Value("Week "), ExtractWeek('created_at'), output_field=CharField())
+                )
+                .values('week_number')
+                .annotate(
+                    total_amount=Sum('invoice_items__amount')
+                )
+                .order_by('week_number')
+            )
+
+            sales_dict = {item['week_number']: item['total_amount'] for item in data}
+
+            print(weeks)
+            print(sales_dict)
+
+            for week in weeks:
+                if week['week_number'] in sales_dict:
+                    week['total_amount'] = sales_dict[week['week_number']]
+
+            return Response(weeks)
+        elif timeframe == 'monthly':
+            months = []
+            month_names = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre',
+                           'Octubre', 'Noviembre', 'Diciembre']
+            current_year = datetime.now().year
+
+            for i in range(1, 13):
+                date_begin = datetime(current_year, i, 1)
+                month_name = month_names[date_begin.month - 1]
+                months.append({'month': month_name, 'total_quantity': 0})
+
+            data = (
+                Invoice.objects.all()
+                .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
+                .filter(created_at__year=current_year)
+                .annotate(
+                    month=ExtractMonth('created_at'),
+                )
+                .values('month')
+                .annotate(
+                    total_amount=Sum('invoice_items__amount')
+                )
+                .order_by('month')
+            )
+
+            sales_dict = {month_names[item['month']-1]: item['total_amount'] for item in data}
+
+            for month in months:
+                if month['month'] in sales_dict:
+                    month['total_amount'] = sales_dict[month['month']]
+
+            return Response(months)
+        else:
+            raise Exception("Param Timeframe necesario: daily, weekly or monthly")
+
+
 class SalesByUsersView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
@@ -548,8 +669,6 @@ class SalesByUsersView(ModelViewSet):
                     total_invoice=Sum("invoice_items__amount"),
                 )
             )
-
-        print(sales_by_user)
 
         return Response(sales_by_user)
 
@@ -596,7 +715,7 @@ class PurchaseView(ModelViewSet):
 
         if selling_price is not None:
             response_data["selling_price"] = "{:.2f}".format(selling_price)
-        
+
         if selling_price_gifts is not None:
             response_data["selling_price_gifts"] = "{:.2f}".format(selling_price_gifts)
 
@@ -984,12 +1103,12 @@ class InvoicesReportExporter(APIView):
         wb.save(response)
         return response
 
+
 class ElectronicInvoiceExporter(APIView):
     http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
-    
+
     def post(self, request):
-        
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
 
@@ -997,7 +1116,8 @@ class ElectronicInvoiceExporter(APIView):
         end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        file_name = 'FormatoFacturaElectronica-'+ start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime("%Y-%m-%d_%H_%M_%S") + '.xlsx'
+        file_name = 'FormatoFacturaElectronica-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
+            "%Y-%m-%d_%H_%M_%S") + '.xlsx'
         print("Filename: ", file_name)
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
@@ -1010,7 +1130,8 @@ class ElectronicInvoiceExporter(APIView):
         ws.title = "QueryDef_Exportar"
 
         electronic_invoice_report_data = (
-            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems", "created_by")
+            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems",
+                                           "created_by")
             .all()
             .filter(created_at__range=(start, end))
             .filter(is_override=False)
@@ -1019,7 +1140,7 @@ class ElectronicInvoiceExporter(APIView):
                 total_invoice=Sum("invoice_items__amount"),
                 descuento=ExpressionWrapper(
                     F("invoice_items__discount") / 100.0, output_field=DecimalField(decimal_places=2)
-                )                
+                )
             )
             .annotate(
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
@@ -1034,11 +1155,17 @@ class ElectronicInvoiceExporter(APIView):
                 iva=Value(Decimal('0.19'), output_field=DecimalField())
             )
             .values_list(
-                "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "payment_methods__name", "created_at__date",
-                "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "bodega", "medida",
-                "invoice_items__quantity", "iva", "invoice_items__item__selling_price", "descuento", "created_at__date", "invoice_items__item_name", "bodega",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value"
+                "empresa", "tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor",
+                "customer__document_id", "nota", "payment_methods__name", "created_at__date",
+                "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "invoice_items__item_code", "bodega", "medida",
+                "invoice_items__quantity", "iva", "invoice_items__item__selling_price", "descuento", "created_at__date",
+                "invoice_items__item_name", "bodega",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value"
             )
         )
 
