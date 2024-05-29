@@ -303,3 +303,22 @@ class InvoiceItem(models.Model):
 
     def __str__(self):
         return f"{self.item_code} - {self.quantity}"
+    
+class Goals(models.Model):
+    DIARY = 'diary'
+    WEEKLY = 'weekly'
+    MONTHLY = 'monthly'
+    ANNUAL = 'annual'
+    
+    GOAL_TYPE_CHOICES = [
+        (DIARY, 'Diary'),
+        (WEEKLY, 'Weekly'),
+        (MONTHLY, 'Monthly'),
+        (ANNUAL, 'Annual'),
+    ]
+
+    goal_type = models.CharField(max_length=20, choices=GOAL_TYPE_CHOICES, unique=True)
+    goal_value = models.FloatField()
+
+    def __str__(self):
+        return f"{self.get_goal_type_display()} - {self.goal_value}"

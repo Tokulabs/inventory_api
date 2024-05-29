@@ -13,11 +13,11 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from sqlparse.sql import Case
 
-from app_control.models import DianResolution, PaymentTerminal, Provider, Customer
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, Customer
 from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
-    Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
+    GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
     CustomerSerializer, InvoiceSimpleSerializer
@@ -473,9 +473,9 @@ class SalePerformance(ModelViewSet):
                 return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
             end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
-            query = query.filter(inventory_invoices__invoice__created_at__date__gte=start_date,  inventory_invoices__invoice__created_at__date__lte=end_date, inventory_invoices__invoice__is_override=False)
+            query = query.filter(inventory_invoices__invoice__created_at__date__gte=start_date,  inventory_invoices__invoice__created_at__date__lte=end_date, inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
         else:
-            query = query.filter(inventory_invoices__invoice__is_override=False)
+            query = query.filter(inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
 
         items = query.values("name", "photo").annotate(
             sum_top_ten_items=Coalesce(
@@ -1168,3 +1168,46 @@ class ElectronicInvoiceExporter(APIView):
 
         wb.save(response)
         return response
+
+
+class GoalView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
+    queryset = Goals.objects.all()
+    serializer_class = GoalSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def get_queryset(self):
+        if self.request.method.lower() != 'get':
+            return self.queryset
+
+        query_set = Goals.objects.all()
+        data = self.request.query_params.dict()
+        keyword = data.pop("keyword", None)
+
+        results = query_set.filter(**data)
+
+        if keyword:
+            search_fields = (
+                "created_by", "goal_type"
+            )
+            query = get_query(keyword, search_fields)
+            return results.filter(query)
+
+        return results
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk=None):
+        goal = Goals.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(goal, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        goal = Goals.objects.filter(pk=pk).first()
+        goal.delete()
+        return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
