@@ -38,6 +38,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True, null=False)
     last_login = models.DateTimeField(null=True)
+    daily_goal= models.FloatField(default=0.0)
 
     USERNAME_FIELD = "email"
     objects = CustomUserManager()
