@@ -47,9 +47,6 @@ class InventorySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class InventoryWithSumSerializer(InventorySerializer):
-    sum_of_item = serializers.IntegerField()
-
 
 class UserWithAmountSerializer(serializers.Serializer):
     user = CustomUserSerializer()
