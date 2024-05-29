@@ -18,7 +18,7 @@ from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
-    Invoice, InvoiceSerializer, InventoryWithSumSerializer,
+    Invoice, InvoiceSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
     CustomerSerializer, InvoiceSimpleSerializer
 )
@@ -458,34 +458,32 @@ class InvoicePainterView(ModelViewSet):
 
 
 class SalePerformance(ModelViewSet):
-    http_method_names = ('get',)
+    http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
-    queryset = InventoryView.queryset
 
-    def list(self, request, *args, **kwargs):
-        query_data = request.query_params.dict()
-        total = query_data.get('total', None)
-        query = self.queryset
+    def top_selling(self, request, *args, **kwargs):
+        query = Inventory.objects.all()
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
 
-        if not total:
-            start_date = query_data.get("start_date", None)
-            end_date = query_data.get("end_date", None)
+        if start_date or end_date:
+            if start_date and not end_date:
+                return Response({"error": "Debe ingresar una fecha de fin"}, status=status.HTTP_400_BAD_REQUEST)
+            if not start_date and end_date:
+                return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(inventory_invoices__invoice__created_at__date__gte=start_date,  inventory_invoices__invoice__created_at__date__lte=end_date, inventory_invoices__invoice__is_override=False)
+        else:
+            query = query.filter(inventory_invoices__invoice__is_override=False)
 
-            if start_date:
-                query = query.filter(
-                    inventory_invoices__created_at__range=[
-                        start_date, end_date]
-                )
-        items = query.filter(inventory_invoices__invoice__is_override=False).annotate(
-            sum_of_item=Coalesce(
+        items = query.values("name", "photo").annotate(
+            sum_top_ten_items=Coalesce(
                 Sum("inventory_invoices__quantity"), 0
             )
-        ).order_by('-sum_of_item')[0:10]
+        ).order_by('-sum_top_ten_items')[0:10]
 
-        print(items)
-
-        response_data = InventoryWithSumSerializer(items, many=True).data
-        return Response(response_data)
+        return Response(items)
 
 
 class HourlySalesQuantities(ModelViewSet):
@@ -637,10 +635,10 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
 
 
 class SalesByUsersView(ModelViewSet):
-    http_method_names = ('get',)
+    http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
 
-    def list(self, request, *args, **kwargs):
+    def sales_by_user(self, request, *args, **kwargs):
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
 
@@ -649,7 +647,8 @@ class SalesByUsersView(ModelViewSet):
                 Invoice.objects.select_related("InvoiceItems", "sale_by")
                 .all()
                 .filter(is_override=False)
-                .values_list(
+                .values(
+                    "sale_by__id",
                     "sale_by__fullname"
                 )
                 .annotate(
@@ -675,24 +674,25 @@ class SalesByUsersView(ModelViewSet):
 
 
 class PurchaseView(ModelViewSet):
-    http_method_names = ('get',)
+    http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
     queryset = InvoiceView.queryset
 
-    def list(self, request, *args, **kwargs):
-        query_data = request.query_params.dict()
-        total = query_data.get('total', None)
+    def purchase_data(self, request, *args, **kwargs):
         query = InvoiceItem.objects.select_related("invoice", "item")
-        start_date = query_data.get("start_date", None)
-        end_date = query_data.get("end_date", None)
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
 
-        if not total and start_date:
-            query = query.filter(
-                Q(create_at__range=[start_date, end_date]) & Q(
-                    invoice__is_override=False)
-            )
+        if start_date or end_date:
+            if start_date and not end_date:
+                return Response({"error": "Debe ingresar una fecha de fin"}, status=status.HTTP_400_BAD_REQUEST)
+            if not start_date and end_date:
+                return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(invoice__created_at__date__gte=start_date, invoice__created_at__date__lte=end_date).filter(invoice__is_override=False)
         else:
-            query = query.exclude(invoice__is_override=True)
+            query = query.filter(invoice__is_override=False)
 
         results = query.aggregate(
             amount_total_no_gifts=Sum(F('amount'), filter=Q(is_gift=False)),
@@ -703,25 +703,19 @@ class PurchaseView(ModelViewSet):
             amount_total_gifts=Sum(F('amount'), filter=Q(is_gift=True))
         )
 
-        selling_price = results.get("amount_total_no_gifts", 0.0)
+        selling_price = results.get("amount_total_no_gifts", 0)
         count = results.get("total", 0)
         gift_count = results.get("gift_total", 0)
-        price_dolar = results.get("amount_total_usd", 0.0)
-        selling_price_gifts = results.get("amount_total_gifts", 0.0)
+        price_dolar = results.get("amount_total_usd", 0)
+        selling_price_gifts = results.get("amount_total_gifts", 0)
 
         response_data = {
             "count": count,
-            "gift_count": gift_count
+            "gift_count": gift_count,
+            "selling_price": selling_price or 0,
+            "selling_price_gifts": selling_price_gifts or 0,
+            "price_dolar": price_dolar or 0
         }
-
-        if selling_price is not None:
-            response_data["selling_price"] = "{:.2f}".format(selling_price)
-
-        if selling_price_gifts is not None:
-            response_data["selling_price_gifts"] = "{:.2f}".format(selling_price_gifts)
-
-        if price_dolar is not None:
-            response_data["price_dolar"] = "{:.2f}".format(price_dolar)
 
         return Response(response_data)
 
