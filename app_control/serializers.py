@@ -1,6 +1,6 @@
 from django.db.models import Sum
 
-from .models import (Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
+from .models import (Goals, Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
                      PaymentTerminal, Provider, Customer)
 from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, \
     PaymentTerminal
@@ -208,3 +208,8 @@ class InvoiceSimpleSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = ("invoice_number", "is_dollar", "is_override", "created_at",
                   "payment_terminal", "payment_methods", "sale_by", "total_sum", "total_sum_usd")
+
+class GoalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Goals
+        fields = ['id', 'goal_type', 'goal_value']
