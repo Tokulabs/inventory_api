@@ -649,7 +649,8 @@ class SalesByUsersView(ModelViewSet):
                 .filter(is_override=False)
                 .values(
                     "sale_by__id",
-                    "sale_by__fullname"
+                    "sale_by__fullname",
+                    "sale_by__daily_goal"
                 )
                 .annotate(
                     total_invoice=Sum("invoice_items__amount"),
@@ -663,7 +664,8 @@ class SalesByUsersView(ModelViewSet):
                 .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
                 .values(
                     "sale_by__id",
-                    "sale_by__fullname"
+                    "sale_by__fullname",
+                    "sale_by__daily_goal"
                 )
                 .annotate(
                     total_invoice=Sum("invoice_items__amount"),
