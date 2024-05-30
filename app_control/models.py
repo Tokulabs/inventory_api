@@ -6,7 +6,7 @@ PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
                                                                    "debitCard"), ("nequi", "nequi"), ("bankTransfer", "bankTransfer"))
 
 Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
-                  ("CE", "CC"), ("TI", "TI"))
+                  ("CE", "CC"), ("TI", "TI"), ("DIE", "DIE"))
 
 class InventoryGroup(models.Model):
     created_by = models.ForeignKey(
