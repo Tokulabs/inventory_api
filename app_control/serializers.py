@@ -1,7 +1,10 @@
-from .models import (Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
+from django.db.models import Sum
+
+from .models import (Goals, Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
                      PaymentTerminal, Provider, Customer)
-from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, PaymentTerminal
-from user_control.serializers import CustomUserSerializer
+from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, \
+    PaymentTerminal
+from user_control.serializers import CustomUserSerializer, CustomUserNamesSerializer
 from rest_framework import serializers
 
 
@@ -43,9 +46,6 @@ class InventorySerializer(serializers.ModelSerializer):
         model = Inventory
         fields = "__all__"
 
-
-class InventoryWithSumSerializer(InventorySerializer):
-    sum_of_item = serializers.IntegerField()
 
 
 class UserWithAmountSerializer(serializers.Serializer):
@@ -183,3 +183,33 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 invoice=invoice, **payment_method_data)
 
         return invoice
+
+
+class PaymentMethodNamesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentMethod
+        fields = ("name",)
+
+
+class PaymentTerminalSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentTerminal
+        fields = ("name", "account_code")
+
+
+class InvoiceSimpleSerializer(serializers.ModelSerializer):
+    payment_terminal = PaymentTerminalSimpleSerializer(read_only=True)
+    payment_methods = PaymentMethodNamesSerializer(many=True)
+    sale_by = CustomUserNamesSerializer(read_only=True)
+    total_sum = serializers.FloatField()
+    total_sum_usd = serializers.FloatField()
+
+    class Meta:
+        model = Invoice
+        fields = ("invoice_number", "is_dollar", "is_override", "created_at",
+                  "payment_terminal", "payment_methods", "sale_by", "total_sum", "total_sum_usd")
+
+class GoalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Goals
+        fields = ['id', 'goal_type', 'goal_value']

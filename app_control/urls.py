@@ -1,9 +1,10 @@
 from django.urls import path, include
 from .views import (
-    DianResolutionView, InventoryView, SummaryView, InvoiceView, PurchaseView,
+    DianResolutionView, GoalView, InventoryView, SummaryView, InvoiceView, PurchaseView,
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
-    InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter
+    InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter, InvoiceSimpleListView,
+    HourlySalesQuantities, SalesBySelectedTimeframeSummary
 )
 
 from rest_framework.routers import DefaultRouter
@@ -15,14 +16,15 @@ router.register('provider', ProviderView, "provider")
 router.register('inventory-csv', InventoryCSVLoaderView, "inventory-csv")
 router.register('summary', SummaryView, "summary")
 router.register('invoice-painter', InvoicePainterView, "invoice-painter")
-router.register('purchase-summary', PurchaseView, "purchase-summary")
 router.register('group', InventoryGroupView, "group")
-router.register('top-selling', SalePerformance, "top-selling")
 router.register('invoice', InvoiceView, "invoice")
 router.register('dian-resolution', DianResolutionView, "dian-resolution")
 router.register('payment-terminal', PaymentTerminalView, "payment-terminal")
-router.register('sales-by-user', SalesByUsersView, "sales-by-user")
 router.register('customer', CustomerView, "customer")
+router.register('invoice-simple-list', InvoiceSimpleListView, "invoice-simple-list")
+router.register('hourly-quantities', HourlySalesQuantities, "hourly-quantities")
+router.register('sales-by-timeframe', SalesBySelectedTimeframeSummary, "sales-by-timeframe")
+router.register('goals', GoalView, "goals")
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -52,4 +54,8 @@ urlpatterns = [
          DianResolutionView.as_view({'post': 'toggle_active'}), name='resolution-toggle'),
     path('group/<int:pk>/toggle-active/',
          InventoryGroupView.as_view({'post': 'toggle_active'}), name='resolution-toggle'),
+    path('purchase-summary', PurchaseView.as_view({'post': 'purchase_data'}), name='purchase-summary'),
+    path('top-selling', SalePerformance.as_view({'post': 'top_selling'}), name='top-selling'),
+    path('sales-by-user', SalesByUsersView.as_view({'post': 'sales_by_user'}), name='sales-by-user'),
+    path('goals/<int:pk>/', GoalView.as_view({'put': 'update', 'delete': 'destroy'}), name='goal-detail'),
 ]

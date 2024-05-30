@@ -1,31 +1,35 @@
 import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-
-from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond
-from django.db.models.functions.text import Upper
+from django.utils import timezone
+from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour, \
+    ExtractDay, ExtractMonth, ExtractWeek
+from django.db.models.functions.text import Upper, Concat
 from openpyxl.styles import Font, Alignment
 from openpyxl.styles.fills import PatternFill
 from openpyxl.utils import get_column_letter
 
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
+from sqlparse.sql import Case
 
-from app_control.models import DianResolution, PaymentTerminal, Provider, Customer
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, Customer
 from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
-    Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
-    Invoice, InvoiceSerializer, InventoryWithSumSerializer,
+    GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
+    Invoice, InvoiceSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer
+    CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, electronic_invoice_report
-from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, DecimalField, IntegerField, When, Case
+    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
+    electronic_invoice_report
+from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
+    DecimalField, IntegerField, When, Case
 from django.db.models.functions import Coalesce, TruncMonth, Cast
 from user_control.models import CustomUser
 import csv
@@ -361,6 +365,37 @@ class InvoiceView(ModelViewSet):
         return Response({"message": "Factura eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
+class InvoiceSimpleListView(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+    serializer_class = InvoiceSimpleSerializer
+    queryset = Invoice.objects.select_related(
+        "created_by", "sale_by", "payment_terminal", "dian_resolution").prefetch_related("invoice_items")
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+
+        keyword = data.pop("keyword", None)
+        results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
+                                                 ).prefetch_related("invoice_items", "payment_methods"
+                                                                    ).filter(**data).filter(
+            invoice_items__is_gift=False)
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "created_by__email", "invoice_number", "dian_resolution__document_number",
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+
+        return results.annotate(
+            total_sum=Sum("invoice_items__amount"),
+            total_sum_usd=Sum("invoice_items__usd_amount")
+        ).order_by('-created_at')
+
+
 class UpdateInvoiceView(APIView):
     def patch(self, request, invoice_number):
         try:
@@ -423,39 +458,187 @@ class InvoicePainterView(ModelViewSet):
 
 
 class SalePerformance(ModelViewSet):
-    http_method_names = ('get',)
+    http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
-    queryset = InventoryView.queryset
 
-    def list(self, request, *args, **kwargs):
-        query_data = request.query_params.dict()
-        total = query_data.get('total', None)
-        query = self.queryset
+    def top_selling(self, request, *args, **kwargs):
+        query = Inventory.objects.all()
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
 
-        if not total:
-            start_date = query_data.get("start_date", None)
-            end_date = query_data.get("end_date", None)
+        if start_date or end_date:
+            if start_date and not end_date:
+                return Response({"error": "Debe ingresar una fecha de fin"}, status=status.HTTP_400_BAD_REQUEST)
+            if not start_date and end_date:
+                return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(inventory_invoices__invoice__created_at__date__gte=start_date,  inventory_invoices__invoice__created_at__date__lte=end_date, inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
+        else:
+            query = query.filter(inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
 
-            if start_date:
-                query = query.filter(
-                    inventory_invoices__created_at__range=[
-                        start_date, end_date]
-                )
-        items = query.filter(inventory_invoices__invoice__is_override=False).annotate(
-            sum_of_item=Coalesce(
+        items = query.values("name", "photo").annotate(
+            sum_top_ten_items=Coalesce(
                 Sum("inventory_invoices__quantity"), 0
             )
-        ).order_by('-sum_of_item')[0:10]
+        ).order_by('-sum_top_ten_items')[0:10]
 
-        response_data = InventoryWithSumSerializer(items, many=True).data
-        return Response(response_data)
+        return Response(items)
+
+
+class HourlySalesQuantities(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def list(self, request, *args, **kwargs):
+        hours = [{'time': hour, 'total_quantity': 0} for hour in range(24)]
+
+        data = (
+            Invoice.objects.all()
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
+            .filter(created_at__gte=datetime.now().date())
+            .annotate(
+                time=ExtractHour('created_at')
+            ).values(
+                'time'
+            ).annotate(
+                total_quantity=Sum('invoice_items__quantity')
+            ).order_by('time')
+        )
+
+        sales_dict = {item['time']: item['total_quantity'] for item in data}
+
+        # Update the hours list with sales data
+        for hour in hours:
+            if hour['time'] in sales_dict:
+                hour['total_quantity'] = sales_dict[hour['time']]
+
+        return Response(hours)
+
+
+class SalesBySelectedTimeframeSummary(ModelViewSet):
+    http_method_names = ('get',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def list(self, request, *args, **kwargs):
+        timeframe = request.GET.get('type', None)
+
+        if timeframe == 'daily':
+            days = []
+            for i in range(7):
+                date_begin = datetime.now() - timedelta(days=i)
+                day = f'{date_begin.day}/{date_begin.month}'
+                days.append({'day': day, 'total_amount': 0})
+
+            days.reverse()
+
+            data = (
+                Invoice.objects.all()
+                .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
+                .filter(created_at__gte=datetime.now().date() - timedelta(days=7))
+                .annotate(
+                    day=Concat(
+                        ExtractDay('created_at'),
+                        Value('/'),
+                        ExtractMonth('created_at'),
+                        output_field=CharField()
+                    )
+                ).values(
+                    'day'
+                ).annotate(
+                    total_amount=Sum('invoice_items__amount')
+                ).order_by('day')
+            )
+
+            sales_dict = {item['day']: item['total_amount'] for item in data}
+
+            print(sales_dict)
+
+            for day in days:
+                if day['day'] in sales_dict:
+                    day['total_amount'] = sales_dict[day['day']]
+
+            return Response(days)
+
+        elif timeframe == 'weekly':
+            weeks = []
+            for i in range(5):
+                date_begin = datetime.now() - timedelta(weeks=i)
+                week_number = f"Week {date_begin.strftime('%V')}"
+                weeks.append({'week_number': week_number, 'total_amount': 0})
+
+            weeks.reverse()
+
+            data = (
+                Invoice.objects.all()
+                .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
+                .filter(created_at__gte=datetime.now().date() - timedelta(weeks=5))
+                .annotate(
+                    week_number=Concat(Value("Week "), ExtractWeek('created_at'), output_field=CharField())
+                )
+                .values('week_number')
+                .annotate(
+                    total_amount=Sum('invoice_items__amount')
+                )
+                .order_by('week_number')
+            )
+
+            sales_dict = {item['week_number']: item['total_amount'] for item in data}
+
+            print(weeks)
+            print(sales_dict)
+
+            for week in weeks:
+                if week['week_number'] in sales_dict:
+                    week['total_amount'] = sales_dict[week['week_number']]
+
+            return Response(weeks)
+
+        elif timeframe == 'monthly':
+            months = []
+            month_names = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre',
+                           'Octubre', 'Noviembre', 'Diciembre']
+            current_year = datetime.now().year
+
+            for i in range(1, 13):
+                date_begin = datetime(current_year, i, 1)
+                month_name = month_names[date_begin.month - 1]
+                months.append({'month': month_name, 'total_amount': 0})
+
+            data = (
+                Invoice.objects.all()
+                .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
+                .filter(created_at__year=current_year)
+                .annotate(
+                    month=ExtractMonth('created_at'),
+                )
+                .values('month')
+                .annotate(
+                    total_amount=Sum('invoice_items__amount')
+                )
+                .order_by('month')
+            )
+
+            sales_dict = {month_names[item['month']-1]: item['total_amount'] for item in data}
+
+            for month in months:
+                if month['month'] in sales_dict:
+                    month['total_amount'] = sales_dict[month['month']]
+
+            return Response(months)
+        else:
+            raise Exception("Param Timeframe necesario: daily, weekly or monthly")
 
 
 class SalesByUsersView(ModelViewSet):
-    http_method_names = ('get',)
+    http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
 
-    def list(self, request, *args, **kwargs):
+    def sales_by_user(self, request, *args, **kwargs):
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
 
@@ -464,8 +647,10 @@ class SalesByUsersView(ModelViewSet):
                 Invoice.objects.select_related("InvoiceItems", "sale_by")
                 .all()
                 .filter(is_override=False)
-                .values_list(
-                    "sale_by__fullname"
+                .values(
+                    "sale_by__id",
+                    "sale_by__fullname",
+                    "sale_by__daily_goal"
                 )
                 .annotate(
                     total_invoice=Sum("invoice_items__amount"),
@@ -479,7 +664,8 @@ class SalesByUsersView(ModelViewSet):
                 .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
                 .values(
                     "sale_by__id",
-                    "sale_by__fullname"
+                    "sale_by__fullname",
+                    "sale_by__daily_goal"
                 )
                 .annotate(
                     total_invoice=Sum("invoice_items__amount"),
@@ -490,24 +676,25 @@ class SalesByUsersView(ModelViewSet):
 
 
 class PurchaseView(ModelViewSet):
-    http_method_names = ('get',)
+    http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
     queryset = InvoiceView.queryset
 
-    def list(self, request, *args, **kwargs):
-        query_data = request.query_params.dict()
-        total = query_data.get('total', None)
+    def purchase_data(self, request, *args, **kwargs):
         query = InvoiceItem.objects.select_related("invoice", "item")
-        start_date = query_data.get("start_date", None)
-        end_date = query_data.get("end_date", None)
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
 
-        if not total and start_date:
-            query = query.filter(
-                Q(create_at__range=[start_date, end_date]) & Q(
-                    invoice__is_override=False)
-            )
+        if start_date or end_date:
+            if start_date and not end_date:
+                return Response({"error": "Debe ingresar una fecha de fin"}, status=status.HTTP_400_BAD_REQUEST)
+            if not start_date and end_date:
+                return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(invoice__created_at__date__gte=start_date, invoice__created_at__date__lte=end_date).filter(invoice__is_override=False)
         else:
-            query = query.exclude(invoice__is_override=True)
+            query = query.filter(invoice__is_override=False)
 
         results = query.aggregate(
             amount_total_no_gifts=Sum(F('amount'), filter=Q(is_gift=False)),
@@ -518,25 +705,19 @@ class PurchaseView(ModelViewSet):
             amount_total_gifts=Sum(F('amount'), filter=Q(is_gift=True))
         )
 
-        selling_price = results.get("amount_total_no_gifts", 0.0)
+        selling_price = results.get("amount_total_no_gifts", 0)
         count = results.get("total", 0)
         gift_count = results.get("gift_total", 0)
-        price_dolar = results.get("amount_total_usd", 0.0)
-        selling_price_gifts = results.get("amount_total_gifts", 0.0)
+        price_dolar = results.get("amount_total_usd", 0)
+        selling_price_gifts = results.get("amount_total_gifts", 0)
 
         response_data = {
             "count": count,
-            "gift_count": gift_count
+            "gift_count": gift_count,
+            "selling_price": selling_price or 0,
+            "selling_price_gifts": selling_price_gifts or 0,
+            "price_dolar": price_dolar or 0
         }
-
-        if selling_price is not None:
-            response_data["selling_price"] = "{:.2f}".format(selling_price)
-        
-        if selling_price_gifts is not None:
-            response_data["selling_price_gifts"] = "{:.2f}".format(selling_price_gifts)
-
-        if price_dolar is not None:
-            response_data["price_dolar"] = "{:.2f}".format(price_dolar)
 
         return Response(response_data)
 
@@ -697,7 +878,6 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(invoice_items__is_gift=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("payment_terminal__name", "sale_by__fullname")
             .annotate(
@@ -713,7 +893,8 @@ class ReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
-            .filter(is_dollar=True).filter(invoice_items__is_gift=False)
+            .filter(is_dollar=True)
+            .filter(invoice_items__is_gift=False)
             .values_list("sale_by__fullname")
             .annotate(
                 quantity=Sum("invoice_items__usd_amount")
@@ -726,7 +907,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(is_override=False)
-            .filter(invoice_items__is_gift=False).filter(invoice_items__is_gift=False)
+            .filter(invoice_items__is_gift=False)
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .values_list("sale_by__fullname")
             .annotate(
@@ -738,7 +919,8 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("InvoiceItems", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False).filter(invoice_items__is_gift=False)
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .filter(is_dollar=True)
             .values_list("sale_by__fullname")
             .annotate(
@@ -750,7 +932,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False).filter(invoice_items__is_gift=False)
+            .filter(is_override=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
             .values_list("sale_by__fullname")
             .annotate(
@@ -762,7 +944,7 @@ class ReportExporter(APIView):
             Invoice.objects.select_related("PaymentMethods", "created_by")
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-            .filter(is_override=False).filter(invoice_items__is_gift=False)
+            .filter(is_override=False)
             .filter(payment_methods__name__in=["nequi", "bankTransfer"])
             .values_list("sale_by__fullname")
             .annotate(
@@ -918,12 +1100,12 @@ class InvoicesReportExporter(APIView):
         wb.save(response)
         return response
 
+
 class ElectronicInvoiceExporter(APIView):
     http_method_names = ('post',)
     permission_classes = (IsAuthenticatedCustom,)
-    
+
     def post(self, request):
-        
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
 
@@ -931,7 +1113,8 @@ class ElectronicInvoiceExporter(APIView):
         end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        file_name = 'FormatoFacturaElectronica-'+ start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime("%Y-%m-%d_%H_%M_%S") + '.xlsx'
+        file_name = 'FormatoFacturaElectronica-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
+            "%Y-%m-%d_%H_%M_%S") + '.xlsx'
         print("Filename: ", file_name)
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
@@ -948,7 +1131,8 @@ class ElectronicInvoiceExporter(APIView):
         ws.title = "Movimientos"
 
         electronic_invoice_report_data = (
-            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems", "created_by")
+            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems",
+                                           "created_by")
             .all()
             .filter(created_at__range=(start, end))
             .filter(is_override=False)
@@ -986,3 +1170,46 @@ class ElectronicInvoiceExporter(APIView):
 
         wb.save(response)
         return response
+
+
+class GoalView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
+    queryset = Goals.objects.all()
+    serializer_class = GoalSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def get_queryset(self):
+        if self.request.method.lower() != 'get':
+            return self.queryset
+
+        query_set = Goals.objects.all()
+        data = self.request.query_params.dict()
+        keyword = data.pop("keyword", None)
+
+        results = query_set.filter(**data)
+
+        if keyword:
+            search_fields = (
+                "created_by", "goal_type"
+            )
+            query = get_query(keyword, search_fields)
+            return results.filter(query)
+
+        return results
+
+    def create(self, request, *args, **kwargs):
+        request.data.update({"created_by_id": request.user.id})
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk=None):
+        goal = Goals.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(goal, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk=None):
+        goal = Goals.objects.filter(pk=pk).first()
+        goal.delete()
+        return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)

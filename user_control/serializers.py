@@ -26,6 +26,12 @@ class CustomUserSerializer(serializers.ModelSerializer):
         exclude = ("password", )
 
 
+class CustomUserNamesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ("fullname", )
+
+
 class UserActivitiesSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserActivities
