@@ -1,7 +1,7 @@
 from django.db.models import Sum
 
 from .models import (Goals, Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
-                     PaymentTerminal, Provider, Customer)
+                     PaymentTerminal, Provider, Customer, Document_types)
 from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, \
     PaymentTerminal
 from user_control.serializers import CustomUserSerializer, CustomUserNamesSerializer
@@ -56,6 +56,7 @@ class UserWithAmountSerializer(serializers.Serializer):
 class CustomerSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
+    document_type = serializers.ChoiceField(Document_types)
 
     class Meta:
         model = Customer

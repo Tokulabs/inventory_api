@@ -5,6 +5,8 @@ from django.contrib.auth.models import (
 Roles = (("admin", "admin"), ("posAdmin", "posAdmin"), ("shopAdmin",
          "shopAdmin"), ("sales", "sales"), ("supportSales", "supportSales"))
 
+Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
+                  ("CE", "CC"), ("TI", "TI"))
 
 class CustomUserManager(BaseUserManager):
     def create_superuser(self, email, password, **extra_fields):
@@ -29,6 +31,7 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     fullname = models.CharField(max_length=255)
+    document_type = models.CharField(max_length=3, choices=Document_types)
     document_id = models.CharField(max_length=255, null=False)
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=12, choices=Roles)
@@ -38,7 +41,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_superuser = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True, null=False)
     last_login = models.DateTimeField(null=True)
-    daily_goal= models.FloatField(default=0.0)
+    daily_goal = models.FloatField(default=0.0)
 
     USERNAME_FIELD = "email"
     objects = CustomUserManager()
