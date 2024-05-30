@@ -1198,7 +1198,7 @@ class ClientsReportExporter(APIView):
 
         wb = Workbook()
         ws = wb.active
-        ws.title = "Terceros"
+        ws.title = "FormatoTerceros"
 
         clients_report_data = (
             Customer.objects.annotate(total_invoices=Count('customer'))
