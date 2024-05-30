@@ -1,10 +1,11 @@
 from rest_framework import serializers
-from .models import CustomUser, Roles, UserActivities
+from .models import CustomUser, Roles, UserActivities, Document_types
 
 
 class CreateUserSerializer(serializers.Serializer):
     email = serializers.EmailField()
     fullname = serializers.CharField()
+    document_type = serializers.ChoiceField(Document_types)
     document_id = serializers.CharField()
     role = serializers.ChoiceField(Roles)
 

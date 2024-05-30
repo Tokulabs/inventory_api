@@ -5,6 +5,8 @@ from user_control.views import add_user_activity
 PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
                                                                    "debitCard"), ("nequi", "nequi"), ("bankTransfer", "bankTransfer"))
 
+Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
+                  ("CE", "CC"), ("TI", "TI"))
 
 class InventoryGroup(models.Model):
     created_by = models.ForeignKey(
@@ -139,6 +141,7 @@ class Customer(models.Model):
         on_delete=models.SET_NULL
     )
     document_id = models.CharField(max_length=20, unique=True)
+    document_type = models.CharField(max_length=3, choices=Document_types, default="CC")
     name = models.CharField(max_length=50)
     phone = models.CharField(max_length=20, null=True)
     email = models.EmailField(null=True)
