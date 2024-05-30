@@ -20,14 +20,14 @@ from .serializers import (
     GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer, InvoiceSimpleSerializer
+    Customer, CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
     create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
-    electronic_invoice_report
+    electronic_invoice_report, clients_report
 from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
     DecimalField, IntegerField, When, Case
 from django.db.models.functions import Coalesce, TruncMonth, Cast
@@ -1119,7 +1119,7 @@ class ElectronicInvoiceExporter(APIView):
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
 
-        payment = {"Efectivo":"Efectivo", "Tarjeta Débito": "Tarjeta Debito Ventas", "Tarjeta Crédito":"Tarjeta Credito Ventas 271", "Nequi":"Transferencias", "Transferencia Bancaria":"Transferencias"}
+        payment = {"cash":"Efectivo", "debitCard": "Tarjeta Debito Ventas", "creditCard":"Tarjeta Credito Ventas 271", "nequi":"Transferencias", "bankTransfer":"Transferencias"}
 
         payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
 
@@ -1171,6 +1171,66 @@ class ElectronicInvoiceExporter(APIView):
         wb.save(response)
         return response
 
+class ClientsReportExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        start = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+        end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        file_name = 'FormatoTerceros-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
+            "%Y-%m-%d_%H_%M_%S") + '.xlsx'
+        print("Filename: ", file_name)
+
+        response['Content-Disposition'] = 'attachment; filename=' + file_name
+
+        docs = {"CC":"CC", "PA": "PASAPORTE", "NIT":"NIT", "CE":"Cédula de extranjería", "DIE":"Documento de identificación extranjero"}
+
+        docs_types = [When(document_type=key, then=Value(value)) for key, value in docs.items()]
+
+        if not start_date or not end_date:
+            return Response({"error": "Por favor ingresar una rango de fechas correcto"})
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Clientes"
+
+        clients_report_data = (
+            Customer.objects.annotate(total_invoices=Count('customer'))
+            .filter(total_invoices__gt=0)
+            .filter(~Q(customer__created_at__lt = start))
+            .distinct()
+            .annotate(
+                doc=Case(*docs_types,output_field=CharField())           
+            )
+            .annotate(
+                b2=ExpressionWrapper(Value('0'), output_field=IntegerField()),
+                null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
+                propiedad=ExpressionWrapper(Value('Cliente'), output_field=CharField()),
+                activo=ExpressionWrapper(Value('-1'), output_field=IntegerField()),
+                retencion=ExpressionWrapper(Value('Persona Natural No responsable del IVA'), output_field=CharField()),
+                clas_dian=ExpressionWrapper(Value('Normal'), output_field=CharField()),
+                tipo_dir=ExpressionWrapper(Value('Casa'), output_field=CharField()),
+                postal=ExpressionWrapper(Value('11111'), output_field=IntegerField())
+            )
+            .values_list(
+                "doc", "b2", "address","name", "null_value", "null_value", "null_value", "propiedad", "activo", "retencion", "null_value", "b2", "clas_dian", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "address", 
+                "activo", "phone", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
+            )
+        )
+
+        clients_report(ws, clients_report_data)
+
+        wb.save(response)
+        return response
 
 class GoalView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')

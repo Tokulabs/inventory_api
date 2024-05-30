@@ -519,9 +519,24 @@ def electronic_invoice_report(ws, report_data):
     for cell in ws[get_column_letter(38)]:
         cell.number_format = '0.00'
 
-    """ for cell in ws[get_column_letter(10)]:
-        cell.number_format = "DD/MM/YYYY"
+def clients_report(ws, report_data):
+    column_titles = ["--Sin Asignar--","--Sin Asignar--","Terceros : Ciudad","Terceros : Primer_Nombre","Terceros : Segundo_Nombre","Terceros : Primer_Apellido",
+                    "Terceros : Segundo_Apellido","Terceros : Propiedad Activa","Terceros : Activo","Terceros : Propiedad Retención","Terceros : FechaDeCreación",
+                    "Terceros : Plazo","Terceros : Clasificación Dian","Terceros : Actividad Económica","Terceros : Matricula","Terceros : Tipos_Responsabilidades",
+                    "Terceros : Aplica_ReteIca","Terceros : Tarifa Ica","Terceros : Maneja_Cupo_Credito","Terceros : Cupo_Credito","Terceros : Código","Terceros : Fecha_Aniversario",
+                    "Terceros : Forma De Pago Predeterminada","Terceros : Lista de Precios","Terceros : Nota","Terceros : Porcentaje_Descuento","Terceros : Vendedor",
+                    "Terceros : Clasificación Uno","Terceros : Clasificación Dos","Terceros : Clasificación Tres","Terceros : Zona Uno","Terceros : Zona Dos","Terceros : Personalizado1",
+                    "Terceros : Personalizado2","Terceros : Personalizado3","Terceros : Personalizado4","Terceros : Personalizado5","Terceros : Personalizado6","Terceros : Personalizado7",
+                    "Terceros : Personalizado8","Terceros : Personalizado9","Terceros : Personalizado10","Terceros : Personalizado11","Terceros : Personalizado12","Terceros : Personalizado13",
+                    "Terceros : Personalizado14","Terceros : Personalizado15","Direcciones : Tipo_dirección","Direcciones : Ciudad_Dirección","Direcciones : Dirección","Direcciones : Dirección_principal",
+                    "Direcciones : Teléfonos","Direcciones : CodigoPostal","Direcciones : Fax","Direcciones : Movil1","Direcciones : Movil2","Direcciones : E_mail","Direcciones : Email2","Direcciones : Email3",
+                    "Direcciones : Pagina Web","Direcciones : Observaciones","Direcciones : Sucursal"]
     
-    for cell in ws[get_column_letter(39)]:
-        cell.number_format = "DD/MM/YYYY" """
+    add_values_to_row_multiple_columns(1, 1, column_titles, ws)
     
+    for column in range(1, 62):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+    
+    for row_idx, row_data in enumerate(report_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
