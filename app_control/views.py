@@ -25,7 +25,7 @@ from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
     create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, electronic_invoice_report
-from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, DecimalField, IntegerField
+from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, DecimalField, IntegerField, When, Case
 from django.db.models.functions import Coalesce, TruncMonth, Cast
 from user_control.models import CustomUser
 import csv
@@ -936,12 +936,16 @@ class ElectronicInvoiceExporter(APIView):
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
 
+        payment = {"Efectivo":"Efectivo", "Tarjeta Débito": "Tarjeta Debito Ventas", "Tarjeta Crédito":"Tarjeta Credito Ventas 271", "Nequi":"Transferencias", "Transferencia Bancaria":"Transferencias"}
+
+        payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
+
         if not start_date or not end_date:
-            return Response({"error": "You need to provide start_date and end_date"})
+            return Response({"error": "Por favor ingresar una rango de fechas correcto"})
 
         wb = Workbook()
         ws = wb.active
-        ws.title = "QueryDef_Exportar"
+        ws.title = "Movimientos"
 
         electronic_invoice_report_data = (
             Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems", "created_by")
@@ -950,28 +954,30 @@ class ElectronicInvoiceExporter(APIView):
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
             .annotate(
-                total_invoice=Sum("invoice_items__amount"),
                 descuento=ExpressionWrapper(
                     F("invoice_items__discount") / 100.0, output_field=DecimalField(decimal_places=2)
-                )                
+                ),
+                valor_unitario=ExpressionWrapper(
+                    F("invoice_items__item__selling_price") / 1.19, output_field=DecimalField(decimal_places=2)
+                ),
+                metodo_pago=Case(*payment_conditions,output_field=CharField())           
             )
             .annotate(
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
-                empresa=ExpressionWrapper(Value('SIGNOS STUDIOS SAS'), output_field=CharField()),
+                empresa=ExpressionWrapper(Value('SIGNOS STUDIOS S.A.S.'), output_field=CharField()),
                 tipo_doc=ExpressionWrapper(Value('FV'), output_field=CharField()),
-                prefijo=ExpressionWrapper(Value('SS'), output_field=CharField()),
-                doc_vendedor=ExpressionWrapper(Value('51023563'), output_field=CharField()),
+                prefijo=ExpressionWrapper(Value('FESS'), output_field=CharField()),
+                doc_vendedor=ExpressionWrapper(Value('832004603'), output_field=IntegerField()),
                 nota=ExpressionWrapper(Value('FACTURA DE VENTA'), output_field=CharField()),
                 verificado=Value(0, output_field=IntegerField()),
-                bodega=ExpressionWrapper(Value('GUASA'), output_field=CharField()),
                 medida=ExpressionWrapper(Value('Und.'), output_field=CharField()),
                 iva=Value(Decimal('0.19'), output_field=DecimalField())
             )
             .values_list(
-                "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "payment_methods__name", "created_at__date",
+                "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "metodo_pago", "created_at__date",
                 "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "bodega", "medida",
-                "invoice_items__quantity", "iva", "invoice_items__item__selling_price", "descuento", "created_at__date", "invoice_items__item_name", "bodega",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "invoice_items__item__cost_center", "medida",
+                "invoice_items__quantity", "iva", "valor_unitario", "descuento", "created_at__date", "invoice_items__item_name", "invoice_items__item__cost_center",
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value"
             )
         )
