@@ -4,7 +4,7 @@ from .views import (
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
     InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter, InvoiceSimpleListView,
-    HourlySalesQuantities, SalesBySelectedTimeframeSummary, ClientsReportExporter
+    HourlySalesQuantities, SalesBySelectedTimeframeSummary
 )
 
 from rest_framework.routers import DefaultRouter
@@ -44,7 +44,6 @@ urlpatterns = [
     path('product_sales_report_export/', ItemsReportExporter.as_view(), name='product_sales_report_export'),
     path('invoices_report_export/', InvoicesReportExporter.as_view(), name='invoices_report_export'),
     path('electronic_invoice_export/', ElectronicInvoiceExporter.as_view(), name='electronic_invoice_export'),
-    path('clients_report_export/', ClientsReportExporter.as_view(), name='clients_report_export'),
     path('inventory/<int:pk>/toggle-active/',
          InventoryView.as_view({'post': 'toggle_active'}), name='inventory-toggle'),
     path('provider/<int:pk>/toggle-active/',

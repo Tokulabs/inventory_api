@@ -1169,38 +1169,14 @@ class ElectronicInvoiceExporter(APIView):
         electronic_invoice_report(ws, electronic_invoice_report_data)
 
         wb.save(response)
-        return response
-
-class ClientsReportExporter(APIView):
-    http_method_names = ('post',)
-    permission_classes = (IsAuthenticatedCustom,)
-
-    def post(self, request):
-        start_date = request.data.get("start_date", None)
-        end_date = request.data.get("end_date", None)
-
-        start = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
-        end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
         today = timezone.now().date()
-
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        file_name = 'FormatoTerceros-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
-            "%Y-%m-%d_%H_%M_%S") + '.xlsx'
-        print("Filename: ", file_name)
-
-        response['Content-Disposition'] = 'attachment; filename=' + file_name
 
         docs = {"CC":"CC", "PA": "PASAPORTE", "NIT":"NIT", "CE":"Cédula de extranjería", "DIE":"Documento de identificación extranjero"}
 
         docs_types = [When(document_type=key, then=Value(value)) for key, value in docs.items()]
 
-        if not start_date or not end_date:
-            return Response({"error": "Por favor ingresar una rango de fechas correcto"})
-
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "FormatoTerceros"
+        ws2 = wb.create_sheet(title = "FormatoTerceros")
 
         clients_report_data = (
             Customer.objects.annotate(total_invoices=Count('customer'))
@@ -1233,9 +1209,10 @@ class ClientsReportExporter(APIView):
             )
         )
 
-        clients_report(ws, clients_report_data)
+        clients_report(ws2, clients_report_data)
 
         wb.save(response)
+
         return response
 
 class GoalView(ModelViewSet):
