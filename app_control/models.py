@@ -146,6 +146,7 @@ class Customer(models.Model):
     phone = models.CharField(max_length=20, null=True)
     email = models.EmailField(null=True)
     address = models.CharField(max_length=255, null=True)
+    city = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
