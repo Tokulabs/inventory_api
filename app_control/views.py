@@ -1214,7 +1214,7 @@ class ClientsReportExporter(APIView):
                 b2=ExpressionWrapper(Value('0'), output_field=IntegerField()),
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
                 hoy=Value(today),
-                ciudad=ExpressionWrapper(Value('Bogotá D.C'), output_field=CharField()),
+                ciudad=Coalesce('city', Value('Bogota D.C.')),
                 propiedad=ExpressionWrapper(Value('Cliente;'), output_field=CharField()),
                 activo=ExpressionWrapper(Value('-1'), output_field=IntegerField()),
                 retencion=ExpressionWrapper(Value('Persona Natural No responsable del IVA'), output_field=CharField()),
@@ -1225,7 +1225,7 @@ class ClientsReportExporter(APIView):
                 zona_dos=ExpressionWrapper(Value('CR 15  01 01'), output_field=CharField()),
             )
             .values_list(
-                "doc", "document_id", "ciudad", "name", "null_value", "null_value", "null_value", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
+                "doc", "document_id", "ciudad", "name", "name", "name", "name", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "zona_uno", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "zona_dos",
