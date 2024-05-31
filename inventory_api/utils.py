@@ -520,17 +520,12 @@ def electronic_invoice_report(ws, report_data):
         cell.number_format = '0.00'
 
 def clients_report(ws, report_data):
-    column_titles = ["--Sin Asignar--","--Sin Asignar--","Terceros : Ciudad","Terceros : Primer_Nombre","Terceros : Segundo_Nombre","Terceros : Primer_Apellido",
-                    "Terceros : Segundo_Apellido","Terceros : Propiedad Activa","Terceros : Activo","Terceros : Propiedad Retención","Terceros : FechaDeCreación",
-                    "Terceros : Plazo","Terceros : Clasificación Dian","Terceros : Actividad Económica","Terceros : Matricula","Terceros : Tipos_Responsabilidades",
-                    "Terceros : Aplica_ReteIca","Terceros : Tarifa Ica","Terceros : Maneja_Cupo_Credito","Terceros : Cupo_Credito","Terceros : Código","Terceros : Fecha_Aniversario",
-                    "Terceros : Forma De Pago Predeterminada","Terceros : Lista de Precios","Terceros : Nota","Terceros : Porcentaje_Descuento","Terceros : Vendedor",
-                    "Terceros : Clasificación Uno","Terceros : Clasificación Dos","Terceros : Clasificación Tres","Terceros : Zona Uno","Terceros : Zona Dos","Terceros : Personalizado1",
-                    "Terceros : Personalizado2","Terceros : Personalizado3","Terceros : Personalizado4","Terceros : Personalizado5","Terceros : Personalizado6","Terceros : Personalizado7",
-                    "Terceros : Personalizado8","Terceros : Personalizado9","Terceros : Personalizado10","Terceros : Personalizado11","Terceros : Personalizado12","Terceros : Personalizado13",
-                    "Terceros : Personalizado14","Terceros : Personalizado15","Direcciones : Tipo_dirección","Direcciones : Ciudad_Dirección","Direcciones : Dirección","Direcciones : Dirección_principal",
-                    "Direcciones : Teléfonos","Direcciones : CodigoPostal","Direcciones : Fax","Direcciones : Movil1","Direcciones : Movil2","Direcciones : E_mail","Direcciones : Email2","Direcciones : Email3",
-                    "Direcciones : Pagina Web","Direcciones : Observaciones","Direcciones : Sucursal"]
+    column_titles = ["Tipo Identificación","No. Identificación","Ciudad Identificación","1er. Nombre o Razón Social ","2do. Nombre","1re. Apellido","2do.Apellido","Propiedad Activa",
+                    "Activo","Propiedad Retención","Fecha Creación","Plazo","Clasificación Dian","Actividad Económica","Matricula","Tipos_Responsabilidades","Aplica ReteIca"," % Ica",
+                    "Maneja Cupo Crédito","Cupo Crédito","Código","Fecha Aniversario","Forma de Pago","Lista Precios","Nota"," % Descuento","Vendedor","Clasificación Uno","Clasificación Dos",
+                    "Clasificación Tres","Zona Uno","Zona Dos","Personalizado 1","Personalizado 2","Personalizado 3","Personalizado 4","Personalizado 5","Personalizado 6","Personalizado 7",
+                    "Personalizado 8","Personalizado 9","Personalizado 10","Personalizado 11","Personalizado 12","Personalizado 13","Personalizado 14","Personalizado 15","Tipo Dirección",
+                    "Ciudad Dirección","Dirección","Dirección Principal","Teléfonos","Código Postal","Fax ","Movil 1","Movil 2","E_Mail ","E_Mail 2","E_Mail 3","Página Web","Observaciones","Sucursal"]
     
     add_values_to_row_multiple_columns(1, 1, column_titles, ws)
     
@@ -540,3 +535,7 @@ def clients_report(ws, report_data):
     for row_idx, row_data in enumerate(report_data, start=2):
         for col_idx, cell_value in enumerate(row_data, start=1):
             ws.cell(row=row_idx, column=col_idx, value=cell_value)
+    
+    for column in [11]:
+        for cell in ws[get_column_letter(column)]:
+            cell.number_format = "DD/MM/YYYY"

@@ -30,7 +30,7 @@ from inventory_api.utils import CustomPagination, get_query, create_terminals_re
     electronic_invoice_report, clients_report
 from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
     DecimalField, IntegerField, When, Case
-from django.db.models.functions import Coalesce, TruncMonth, Cast
+from django.db.models.functions import Coalesce, TruncMonth, Cast, Now
 from user_control.models import CustomUser
 import csv
 import codecs
@@ -1182,6 +1182,8 @@ class ClientsReportExporter(APIView):
         start = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
         end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
 
+        today = timezone.now().date()
+
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         file_name = 'FormatoTerceros-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
             "%Y-%m-%d_%H_%M_%S") + '.xlsx'
@@ -1211,18 +1213,22 @@ class ClientsReportExporter(APIView):
             .annotate(
                 b2=ExpressionWrapper(Value('0'), output_field=IntegerField()),
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
-                propiedad=ExpressionWrapper(Value('Cliente'), output_field=CharField()),
+                hoy=Value(today),
+                ciudad=ExpressionWrapper(Value('Bogotá D.C'), output_field=CharField()),
+                propiedad=ExpressionWrapper(Value('Cliente;'), output_field=CharField()),
                 activo=ExpressionWrapper(Value('-1'), output_field=IntegerField()),
                 retencion=ExpressionWrapper(Value('Persona Natural No responsable del IVA'), output_field=CharField()),
                 clas_dian=ExpressionWrapper(Value('Normal'), output_field=CharField()),
                 tipo_dir=ExpressionWrapper(Value('Casa'), output_field=CharField()),
-                postal=ExpressionWrapper(Value('11111'), output_field=IntegerField())
+                postal=ExpressionWrapper(Value('11111'), output_field=IntegerField()),
+                zona_uno=ExpressionWrapper(Value('CENTRO'), output_field=CharField()),
+                zona_dos=ExpressionWrapper(Value('CR 15  01 01'), output_field=CharField()),
             )
             .values_list(
-                "doc", "b2", "address","name", "null_value", "null_value", "null_value", "propiedad", "activo", "retencion", "null_value", "b2", "clas_dian", "null_value", 
+                "doc", "document_id", "ciudad", "name", "null_value", "null_value", "null_value", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "address", 
+                "null_value", "null_value", "null_value", "null_value", "zona_uno", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "zona_dos",
                 "activo", "phone", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
             )
         )
