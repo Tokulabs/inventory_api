@@ -1168,8 +1168,6 @@ class ElectronicInvoiceExporter(APIView):
 
         electronic_invoice_report(ws, electronic_invoice_report_data)
 
-        wb.save(response)
-
         today = timezone.now().date()
 
         docs = {"CC":"CC", "PA": "PASAPORTE", "NIT":"NIT", "CE":"Cédula de extranjería", "DIE":"Documento de identificación extranjero"}
@@ -1199,13 +1197,15 @@ class ElectronicInvoiceExporter(APIView):
                 postal=ExpressionWrapper(Value('11111'), output_field=IntegerField()),
                 zona_uno=ExpressionWrapper(Value('CENTRO'), output_field=CharField()),
                 zona_dos=ExpressionWrapper(Value('CR 15  01 01'), output_field=CharField()),
+                direccion=Coalesce('address', Value('CR 15  01 01')),
+                telefono=Coalesce('phone', Value('3333333333')),
             )
             .values_list(
                 "doc", "document_id", "ciudad", "name", "name", "name", "name", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "zona_uno", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "zona_dos",
-                "activo", "phone", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "direccion",
+                "activo", "telefono", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
             )
         )
 
