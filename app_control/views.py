@@ -1168,8 +1168,6 @@ class ElectronicInvoiceExporter(APIView):
 
         electronic_invoice_report(ws, electronic_invoice_report_data)
 
-        wb.save(response)
-
         today = timezone.now().date()
 
         docs = {"CC":"CC", "PA": "PASAPORTE", "NIT":"NIT", "CE":"Cédula de extranjería", "DIE":"Documento de identificación extranjero"}
