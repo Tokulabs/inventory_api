@@ -1148,7 +1148,7 @@ class ElectronicInvoiceExporter(APIView):
             )
             .annotate(
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
-                empresa=ExpressionWrapper(Value('SIGNOS STUDIOS S.A.S.'), output_field=CharField()),
+                empresa=ExpressionWrapper(Value('SIGNOS STUDIO S.A.S.'), output_field=CharField()),
                 tipo_doc=ExpressionWrapper(Value('FV'), output_field=CharField()),
                 prefijo=ExpressionWrapper(Value('FESS'), output_field=CharField()),
                 doc_vendedor=ExpressionWrapper(Value('832004603'), output_field=IntegerField()),
