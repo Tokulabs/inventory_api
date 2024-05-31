@@ -20,17 +20,17 @@ from .serializers import (
     GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer,
     InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
-    CustomerSerializer, InvoiceSimpleSerializer
+    Customer, CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
     create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
-    electronic_invoice_report
+    electronic_invoice_report, clients_report
 from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
     DecimalField, IntegerField, When, Case
-from django.db.models.functions import Coalesce, TruncMonth, Cast
+from django.db.models.functions import Coalesce, TruncMonth, Cast, Now
 from user_control.models import CustomUser
 import csv
 import codecs
@@ -1168,9 +1168,52 @@ class ElectronicInvoiceExporter(APIView):
 
         electronic_invoice_report(ws, electronic_invoice_report_data)
 
-        wb.save(response)
-        return response
+        today = timezone.now().date()
 
+        docs = {"CC":"CC", "PA": "PASAPORTE", "NIT":"NIT", "CE":"Cédula de extranjería", "DIE":"Documento de identificación extranjero"}
+
+        docs_types = [When(document_type=key, then=Value(value)) for key, value in docs.items()]
+
+        ws2 = wb.create_sheet(title = "FormatoTerceros")
+
+        clients_report_data = (
+            Customer.objects.annotate(total_invoices=Count('customer'))
+            .filter(total_invoices__gt=0)
+            .filter(~Q(customer__created_at__lt = start))
+            .distinct()
+            .annotate(
+                doc=Case(*docs_types,output_field=CharField())           
+            )
+            .annotate(
+                b2=ExpressionWrapper(Value('0'), output_field=IntegerField()),
+                null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
+                hoy=Value(today),
+                ciudad=Coalesce('city', Value('Bogota D.C.')),
+                propiedad=ExpressionWrapper(Value('Cliente;'), output_field=CharField()),
+                activo=ExpressionWrapper(Value('-1'), output_field=IntegerField()),
+                retencion=ExpressionWrapper(Value('Persona Natural No responsable del IVA'), output_field=CharField()),
+                clas_dian=ExpressionWrapper(Value('Normal'), output_field=CharField()),
+                tipo_dir=ExpressionWrapper(Value('Casa'), output_field=CharField()),
+                postal=ExpressionWrapper(Value('11111'), output_field=IntegerField()),
+                zona_uno=ExpressionWrapper(Value('CENTRO'), output_field=CharField()),
+                zona_dos=ExpressionWrapper(Value('CR 15  01 01'), output_field=CharField()),
+                direccion=Coalesce('address', Value('CR 15  01 01')),
+                telefono=Coalesce('phone', Value('3333333333')),
+            )
+            .values_list(
+                "doc", "document_id", "ciudad", "name", "name", "name", "name", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "zona_uno", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "direccion",
+                "activo", "telefono", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
+            )
+        )
+
+        clients_report(ws2, clients_report_data)
+
+        wb.save(response)
+
+        return response
 
 class GoalView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
