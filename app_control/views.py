@@ -1191,7 +1191,7 @@ class ElectronicInvoiceExporter(APIView):
                 ciudad=Coalesce('city', Value('Bogota D.C.')),
                 propiedad=ExpressionWrapper(Value('Cliente;'), output_field=CharField()),
                 activo=ExpressionWrapper(Value('-1'), output_field=IntegerField()),
-                retencion=ExpressionWrapper(Value('Persona Natural No responsable del IVA'), output_field=CharField()),
+                retencion=ExpressionWrapper(Value('Persona Natural No Responsable del IVA'), output_field=CharField()),
                 clas_dian=ExpressionWrapper(Value('Normal'), output_field=CharField()),
                 tipo_dir=ExpressionWrapper(Value('Casa'), output_field=CharField()),
                 postal=ExpressionWrapper(Value('11111'), output_field=IntegerField()),
@@ -1201,9 +1201,9 @@ class ElectronicInvoiceExporter(APIView):
                 telefono=Coalesce('phone', Value('3333333333')),
             )
             .values_list(
-                "doc", "document_id", "ciudad", "name", "name", "name", "name", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
+                "doc", "document_id", "ciudad", "name", "null_value", "null_value", "null_value", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "zona_uno", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
+                "null_value", "null_value", "null_value", "null_value", "null_value", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "direccion",
                 "activo", "telefono", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
             )
