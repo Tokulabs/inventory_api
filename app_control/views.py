@@ -1120,8 +1120,10 @@ class ElectronicInvoiceExporter(APIView):
         response['Content-Disposition'] = 'attachment; filename=' + file_name
 
         payment = {"cash":"Efectivo", "debitCard": "Tarjeta Debito Ventas", "creditCard":"Tarjeta Credito Ventas 271", "nequi":"Transferencias", "bankTransfer":"Transferencias"}
+        bodega= {"Guasá":"San Pablo"}
 
         payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
+        bodega_value = [When(invoice_items__item__cost_center=key, then=Value(value)) for key, value in bodega.items()]
 
         if not start_date or not end_date:
             return Response({"error": "Por favor ingresar una rango de fechas correcto"})
@@ -1144,7 +1146,8 @@ class ElectronicInvoiceExporter(APIView):
                 valor_unitario=ExpressionWrapper(
                     F("invoice_items__item__selling_price") / 1.19, output_field=DecimalField(decimal_places=2)
                 ),
-                metodo_pago=Case(*payment_conditions,output_field=CharField())           
+                metodo_pago=Case(*payment_conditions,output_field=CharField()),
+                nueva_bodega=Case(*bodega_value,output_field=CharField())
             )
             .annotate(
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
@@ -1160,7 +1163,7 @@ class ElectronicInvoiceExporter(APIView):
             .values_list(
                 "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "metodo_pago", "created_at__date",
                 "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "invoice_items__item__cost_center", "medida",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "nueva_bodega", "medida",
                 "invoice_items__quantity", "iva", "valor_unitario", "descuento", "created_at__date", "invoice_items__item_name", "invoice_items__item__cost_center",
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value"
             )
