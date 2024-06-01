@@ -1120,7 +1120,7 @@ class ElectronicInvoiceExporter(APIView):
         response['Content-Disposition'] = 'attachment; filename=' + file_name
 
         payment = {"cash":"Efectivo", "debitCard": "Tarjeta Debito Ventas", "creditCard":"Tarjeta Credito Ventas 271", "nequi":"Transferencias", "bankTransfer":"Transferencias"}
-        bodega= {"Guasá":"San Pablo"}
+        bodega= {"Guasá":"San Pablo", "CHOCOLATE":"CHOCOLATE"}
 
         payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
         bodega_value = [When(invoice_items__item__cost_center=key, then=Value(value)) for key, value in bodega.items()]
