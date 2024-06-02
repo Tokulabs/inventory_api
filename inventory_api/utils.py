@@ -312,7 +312,7 @@ def create_cash_report(ws, last_row, last_row_cards, report_data, dollar_report_
         start_colum_letter = get_column_letter(start_column)
         total_formulas_last_row.append(
             f"={start_colum_letter}{beginning_row + 2}-{start_colum_letter}{beginning_row + 3}"
-            f"-{start_colum_letter}{beginning_row + 4}+{start_colum_letter}{beginning_row + 5}"
+            f"-{start_colum_letter}{beginning_row + 4}-{start_colum_letter}{beginning_row + 5}"
             f"-{start_colum_letter}{beginning_row + 6}"
         )
     add_values_to_row_multiple_columns(3, beginning_row + 7, total_formulas_last_row, ws)
