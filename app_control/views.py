@@ -1284,7 +1284,6 @@ class InvoicePaymentMethodsView(APIView):
 
     def post(self, request, *args, **kwargs):
         invoice_id = request.GET.get('invoice_id', None)
-        print(invoice_id)
 
         invoice = Invoice.objects.filter(id=invoice_id).first()
         if invoice is None:
@@ -1303,7 +1302,6 @@ class InvoicePaymentMethodsView(APIView):
                     {"error": "Los métodos de pago deben tener nombre, monto pagado, monto de vuelto y monto recibido"})
 
         for method in payment_methods:
-            print(method)
             PaymentMethod.objects.create(
                 invoice_id=invoice_id,
                 name=method.get("name"),
@@ -1312,6 +1310,8 @@ class InvoicePaymentMethodsView(APIView):
                 received_amount=method.get("received_amount"),
                 transaction_code=method.get("transaction_code", None)
             )
+
+        if 'payment_terminal_id' in request.data:
             invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
             invoice.save()
 
