@@ -13,7 +13,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from sqlparse.sql import Case
 
-from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, Customer
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, Customer, PaymentMethod
 from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
@@ -473,7 +473,9 @@ class SalePerformance(ModelViewSet):
                 return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
             end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
-            query = query.filter(inventory_invoices__invoice__created_at__date__gte=start_date,  inventory_invoices__invoice__created_at__date__lte=end_date, inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
+            query = query.filter(inventory_invoices__invoice__created_at__date__gte=start_date,
+                                 inventory_invoices__invoice__created_at__date__lte=end_date,
+                                 inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
         else:
             query = query.filter(inventory_invoices__invoice__is_override=False, inventory_invoices__is_gift=False)
 
@@ -623,7 +625,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
                 .order_by('month')
             )
 
-            sales_dict = {month_names[item['month']-1]: item['total_amount'] for item in data}
+            sales_dict = {month_names[item['month'] - 1]: item['total_amount'] for item in data}
 
             for month in months:
                 if month['month'] in sales_dict:
@@ -692,7 +694,8 @@ class PurchaseView(ModelViewSet):
                 return Response({"error": "Debe ingresar una fecha de inicio"}, status=status.HTTP_400_BAD_REQUEST)
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
             end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
-            query = query.filter(invoice__created_at__date__gte=start_date, invoice__created_at__date__lte=end_date).filter(invoice__is_override=False)
+            query = query.filter(invoice__created_at__date__gte=start_date,
+                                 invoice__created_at__date__lte=end_date).filter(invoice__is_override=False)
         else:
             query = query.filter(invoice__is_override=False)
 
@@ -1119,8 +1122,9 @@ class ElectronicInvoiceExporter(APIView):
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
 
-        payment = {"cash":"Efectivo", "debitCard": "Tarjeta Debito Ventas", "creditCard":"Tarjeta Credito Ventas 271", "nequi":"Transferencias", "bankTransfer":"Transferencias"}
-        bodega= {"Guasá":"San Pablo", "CHOCOLATE":"CHOCOLATE"}
+        payment = {"cash": "Efectivo", "debitCard": "Tarjeta Debito Ventas", "creditCard": "Tarjeta Credito Ventas 271",
+                   "nequi": "Transferencias", "bankTransfer": "Transferencias"}
+        bodega = {"Guasá": "San Pablo", "CHOCOLATE": "CHOCOLATE"}
 
         payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
         bodega_value = [When(invoice_items__item__cost_center=key, then=Value(value)) for key, value in bodega.items()]
@@ -1146,8 +1150,8 @@ class ElectronicInvoiceExporter(APIView):
                 valor_unitario=ExpressionWrapper(
                     F("invoice_items__item__selling_price") / 1.19, output_field=DecimalField(decimal_places=2)
                 ),
-                metodo_pago=Case(*payment_conditions,output_field=CharField()),
-                nueva_bodega=Case(*bodega_value,output_field=CharField())
+                metodo_pago=Case(*payment_conditions, output_field=CharField()),
+                nueva_bodega=Case(*bodega_value, output_field=CharField())
             )
             .annotate(
                 null_value=ExpressionWrapper(Value(None, output_field=CharField()), output_field=CharField()),
@@ -1161,11 +1165,17 @@ class ElectronicInvoiceExporter(APIView):
                 iva=Value(Decimal('0.19'), output_field=DecimalField())
             )
             .values_list(
-                "empresa","tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor", "customer__document_id", "nota", "metodo_pago", "created_at__date",
-                "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "invoice_items__item_code", "nueva_bodega", "medida",
-                "invoice_items__quantity", "iva", "valor_unitario", "descuento", "created_at__date", "invoice_items__item_name", "invoice_items__item__cost_center",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value"
+                "empresa", "tipo_doc", "prefijo", "invoice_number", "created_at__date", "doc_vendedor",
+                "customer__document_id", "nota", "metodo_pago", "created_at__date",
+                "null_value", "null_value", "verificado", "verificado", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "invoice_items__item_code", "nueva_bodega", "medida",
+                "invoice_items__quantity", "iva", "valor_unitario", "descuento", "created_at__date",
+                "invoice_items__item_name", "invoice_items__item__cost_center",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value"
             )
         )
 
@@ -1173,19 +1183,20 @@ class ElectronicInvoiceExporter(APIView):
 
         today = timezone.now().date()
 
-        docs = {"CC":"CC", "PA": "PASAPORTE", "NIT":"NIT", "CE":"Cédula de extranjería", "DIE":"Documento de identificación extranjero"}
+        docs = {"CC": "CC", "PA": "PASAPORTE", "NIT": "NIT", "CE": "Cédula de extranjería",
+                "DIE": "Documento de identificación extranjero"}
 
         docs_types = [When(document_type=key, then=Value(value)) for key, value in docs.items()]
 
-        ws2 = wb.create_sheet(title = "FormatoTerceros")
+        ws2 = wb.create_sheet(title="FormatoTerceros")
 
         clients_report_data = (
             Customer.objects.annotate(total_invoices=Count('customer'))
             .filter(total_invoices__gt=0)
-            .filter(~Q(customer__created_at__lt = start))
+            .filter(~Q(customer__created_at__lt=start))
             .distinct()
             .annotate(
-                doc=Case(*docs_types,output_field=CharField())           
+                doc=Case(*docs_types, output_field=CharField())
             )
             .annotate(
                 b2=ExpressionWrapper(Value('0'), output_field=IntegerField()),
@@ -1204,11 +1215,16 @@ class ElectronicInvoiceExporter(APIView):
                 telefono=Coalesce('phone', Value('3333333333')),
             )
             .values_list(
-                "doc", "document_id", "ciudad", "name", "null_value", "null_value", "null_value", "propiedad", "activo", "retencion", "hoy", "b2", "clas_dian", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "null_value", "zona_dos", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", 
-                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "tipo_dir", "ciudad", "direccion",
-                "activo", "telefono", "postal", "null_value", "null_value", "null_value", "email", "null_value", "null_value", "null_value", "null_value", "null_value"
+                "doc", "document_id", "ciudad", "name", "null_value", "null_value", "null_value", "propiedad", "activo",
+                "retencion", "hoy", "b2", "clas_dian", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "zona_dos", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
+                "null_value", "null_value", "tipo_dir", "ciudad", "direccion",
+                "activo", "telefono", "postal", "null_value", "null_value", "null_value", "email", "null_value",
+                "null_value", "null_value", "null_value", "null_value"
             )
         )
 
@@ -1217,6 +1233,7 @@ class ElectronicInvoiceExporter(APIView):
         wb.save(response)
 
         return response
+
 
 class GoalView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
@@ -1259,3 +1276,43 @@ class GoalView(ModelViewSet):
         goal = Goals.objects.filter(pk=pk).first()
         goal.delete()
         return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
+
+
+class InvoicePaymentMethodsView(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request, *args, **kwargs):
+        invoice_id = request.GET.get('invoice_id', None)
+        print(invoice_id)
+
+        invoice = Invoice.objects.filter(id=invoice_id).first()
+        if invoice is None:
+            return Response({"error": "Factura no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+        invoice.payment_methods.all().delete()
+
+        payment_methods = request.data.get("payment_methods", None)
+        if not payment_methods:
+            return Response({"error": "Debe ingresar los métodos de pago"}, status=status.HTTP_400_BAD_REQUEST)
+
+        for method in payment_methods:
+            if (method.get("name") is None or method.get("paid_amount") is None or method.get(
+                    "back_amount") is None or method.get("received_amount") is None):
+                return Response(
+                    {"error": "Los métodos de pago deben tener nombre, monto pagado, monto de vuelto y monto recibido"})
+
+        for method in payment_methods:
+            print(method)
+            PaymentMethod.objects.create(
+                invoice_id=invoice_id,
+                name=method.get("name"),
+                paid_amount=method.get("paid_amount"),
+                back_amount=method.get("back_amount"),
+                received_amount=method.get("received_amount"),
+                transaction_code=method.get("transaction_code", None)
+            )
+            invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
+            invoice.save()
+
+        return Response({"message": "Métodos de pago actualizados satisfactoriamente"}, status=status.HTTP_200_OK)
