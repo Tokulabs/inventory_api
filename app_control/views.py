@@ -1315,4 +1315,8 @@ class InvoicePaymentMethodsView(APIView):
             invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
             invoice.save()
 
+        if 'is_dollar' in request.data:
+            invoice.is_dollar = request.data.get("is_dollar", None)
+            invoice.save()
+
         return Response({"message": "Métodos de pago actualizados satisfactoriamente"}, status=status.HTTP_200_OK)
