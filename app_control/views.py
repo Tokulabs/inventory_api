@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
+
+from django.db.models.functions.window import RowNumber, Rank
 from django.utils import timezone
 from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour, \
     ExtractDay, ExtractMonth, ExtractWeek
@@ -27,9 +29,9 @@ from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
     create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
-    electronic_invoice_report, clients_report
+    electronic_invoice_report, clients_report, electronic_invoice_report_by_invoice
 from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
-    DecimalField, IntegerField, When, Case
+    DecimalField, IntegerField, When, Case, Window
 from django.db.models.functions import Coalesce, TruncMonth, Cast, Now
 from user_control.models import CustomUser
 import csv
@@ -1320,3 +1322,80 @@ class InvoicePaymentMethodsView(APIView):
             invoice.save()
 
         return Response({"message": "Métodos de pago actualizados satisfactoriamente"}, status=status.HTTP_200_OK)
+
+
+class IndividualElectronicInvoiceExporter(APIView):
+    http_method_names = ('post',)
+    permission_classes = (IsAuthenticatedCustom,)
+
+    def post(self, request):
+        start_date = request.data.get("start_date", None)
+        end_date = request.data.get("end_date", None)
+
+        start = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+        end = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        file_name = 'DetalleDePago-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
+            "%Y-%m-%d_%H_%M_%S") + '.xlsx'
+        print("Filename: ", file_name)
+
+        response['Content-Disposition'] = 'attachment; filename=' + file_name
+
+        payment = {"cash": "Efectivo", "debitCard": "Tarjeta Débito", "creditCard": "Tarjeta Crédito",
+                   "nequi": "Transferencias", "bankTransfer": "Transferencias"}
+
+        payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
+
+        if not start_date or not end_date:
+            return Response({"error": "Por favor ingresar una rango de fechas correcto"})
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Detalle Pago"
+
+        payment_methods_report = (
+            Invoice.objects.select_related("invoice_number", "PaymentMethods", "InvoiceItems",
+                                           "created_by")
+            .all()
+            .filter(created_at__range=(start, end))
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
+            .annotate(
+                row_number=Window(
+                    expression=RowNumber(),
+                    partition_by=['invoice_number'],
+                    order_by=F('payment_methods__id').asc()
+                ),
+            )
+            .annotate(
+                payment_method_normalized=Case(*payment_conditions, output_field=CharField())
+            )
+            .values_list(
+                "invoice_number", "payment_method_normalized", "row_number"
+            )
+            .order_by("invoice_number")
+        )
+
+        payment_methods_report = [item for item in payment_methods_report if item[2] == 1]
+
+        amount_report = (
+            Invoice.objects.select_related("invoice_number", "InvoiceItems")
+            .all()
+            .filter(created_at__range=(start, end))
+            .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
+            .annotate(
+                sum_amount=Sum("invoice_items__amount")
+            )
+            .values_list(
+                "invoice_number", "sum_amount"
+            )
+            .order_by("invoice_number")
+        )
+
+        electronic_invoice_report_by_invoice(ws, payment_methods_report, amount_report)
+
+        wb.save(response)
+
+        return response

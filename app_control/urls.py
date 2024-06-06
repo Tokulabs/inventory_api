@@ -4,7 +4,8 @@ from .views import (
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
     InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter, InvoiceSimpleListView,
-    HourlySalesQuantities, SalesBySelectedTimeframeSummary, InvoicePaymentMethodsView
+    HourlySalesQuantities, SalesBySelectedTimeframeSummary, InvoicePaymentMethodsView,
+    IndividualElectronicInvoiceExporter
 )
 
 from rest_framework.routers import DefaultRouter
@@ -59,4 +60,7 @@ urlpatterns = [
     path('sales-by-user', SalesByUsersView.as_view({'post': 'sales_by_user'}), name='sales-by-user'),
     path('goals/<int:pk>/', GoalView.as_view({'put': 'update', 'delete': 'destroy'}), name='goal-detail'),
     path('update-payment-methods', InvoicePaymentMethodsView.as_view(), name='invoice-payment-methods'),
+    path('individual_electronic_invoice/',
+         IndividualElectronicInvoiceExporter.as_view(),
+         name='electronic_invoice_export_by_invoice'),
 ]
