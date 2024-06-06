@@ -539,3 +539,36 @@ def clients_report(ws, report_data):
     for column in [11]:
         for cell in ws[get_column_letter(column)]:
             cell.number_format = "DD/MM/YYYY"
+
+
+def electronic_invoice_report_by_invoice(ws, payment_methods_data, amount_data):
+    column_titles = ["Detalle del Pago : Número de documento ",
+                     "Detalle del Pago: Forma de Pago",
+                     "column_to_erase",
+                     "column_to_erase",
+                     "Detalle del Pago: Valor",
+                     "Detalle del Pago: Banco / Entidad",
+                     "Detalle del Pago: Número Transacción ",
+                     "Detalle del Pago: Tipo Tarjeta",
+                     "Detalle del Pago: Tipo Bono - Vale",
+                     "Detalle del Pago: Fecha",
+                     "Detalle del Pago: Medio de Pago"]
+
+    add_values_to_row_multiple_columns(1, 1, column_titles, ws)
+    apply_styles_to_cells(start_column=1, start_row=1, end_column=len(column_titles), end_row=1, ws=ws,
+                          font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
+    for column in range(1, 10):
+        ws.column_dimensions[get_column_letter(column)].width = 20
+
+    for row_idx, row_data in enumerate(payment_methods_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    for row_idx, row_data in enumerate(amount_data, start=2):
+        for col_idx, cell_value in enumerate(row_data, start=4):
+            ws.cell(row=row_idx, column=col_idx, value=cell_value)
+
+    for cell in ws[get_column_letter(5)]:
+        cell.number_format = '0.00'
+
+    ws.delete_cols(3, 2)
