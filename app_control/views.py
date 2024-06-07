@@ -1126,7 +1126,7 @@ class ElectronicInvoiceExporter(APIView):
 
         payment = {"cash": "Efectivo", "debitCard": "Tarjeta Debito Ventas", "creditCard": "Tarjeta Credito Ventas 271",
                    "nequi": "Transferencias", "bankTransfer": "Transferencias"}
-        bodega = {"Guasá": "San Pablo", "CHOCOLATE": "CHOCOLATE"}
+        bodega = {"Guasá": "San Pablo", "CHOCOLATE": "San Pablo"}
 
         payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
         bodega_value = [When(invoice_items__item__cost_center=key, then=Value(value)) for key, value in bodega.items()]
@@ -1211,8 +1211,6 @@ class ElectronicInvoiceExporter(APIView):
                 clas_dian=ExpressionWrapper(Value('Normal'), output_field=CharField()),
                 tipo_dir=ExpressionWrapper(Value('Casa'), output_field=CharField()),
                 postal=ExpressionWrapper(Value('11111'), output_field=IntegerField()),
-                zona_uno=ExpressionWrapper(Value('CENTRO'), output_field=CharField()),
-                zona_dos=ExpressionWrapper(Value('CR 15  01 01'), output_field=CharField()),
                 direccion=Coalesce('address', Value('CR 15  01 01')),
                 telefono=Coalesce('phone', Value('3333333333')),
             )
@@ -1221,7 +1219,7 @@ class ElectronicInvoiceExporter(APIView):
                 "retencion", "hoy", "b2", "clas_dian", "null_value",
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
                 "null_value", "null_value", "null_value", "null_value", "null_value",
-                "null_value", "null_value", "null_value", "null_value", "null_value", "zona_dos", "null_value",
+                "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
                 "null_value", "null_value", "null_value", "null_value", "null_value",
                 "null_value", "null_value", "null_value", "null_value", "null_value", "null_value", "null_value",
                 "null_value", "null_value", "tipo_dir", "ciudad", "direccion",
