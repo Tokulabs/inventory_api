@@ -1230,10 +1230,7 @@ class ElectronicInvoiceExporter(APIView):
 
         clients_report(ws2, clients_report_data)
 
-        new_payment = {"cash": "Efectivo", "debitCard": "Tarjeta Débito", "creditCard": "Tarjeta Crédito",
-                   "nequi": "Transferencias", "bankTransfer": "Transferencias"}
-
-        new_payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in new_payment.items()]
+        new_payment_conditions = [When(payment_methods__name=key, then=Value(value)) for key, value in payment.items()]
 
         ws3 = wb.create_sheet(title="Detalle Facturas")
 
