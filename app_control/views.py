@@ -558,8 +558,6 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
 
             sales_dict = {item['day']: item['total_amount'] for item in data}
 
-            print(sales_dict)
-
             for day in days:
                 if day['day'] in sales_dict:
                     day['total_amount'] = sales_dict[day['day']]
@@ -591,9 +589,6 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             )
 
             sales_dict = {item['week_number']: item['total_amount'] for item in data}
-
-            print(weeks)
-            print(sales_dict)
 
             for week in weeks:
                 if week['week_number'] in sales_dict:
@@ -634,6 +629,45 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
                     month['total_amount'] = sales_dict[month['month']]
 
             return Response(months)
+        
+        elif timeframe == 'general':
+            today = datetime.now().date()
+            current_week_start = today - timedelta(days=today.weekday())
+            current_month_start = today.replace(day=1)
+            current_year_start = today.replace(month=1, day=1)
+
+            total_day = Invoice.objects.filter(
+                is_override=False,
+                invoice_items__is_gift=False,
+                created_at__date=today
+            ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
+
+            total_week = Invoice.objects.filter(
+                is_override=False,
+                invoice_items__is_gift=False,
+                created_at__gte=current_week_start
+            ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
+
+            total_month = Invoice.objects.filter(
+                is_override=False,
+                invoice_items__is_gift=False,
+                created_at__gte=current_month_start
+            ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
+
+            total_year = Invoice.objects.filter(
+                is_override=False,
+                invoice_items__is_gift=False,
+                created_at__gte=current_year_start
+            ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
+
+            general_values = {
+                'diary': total_day,
+                'weekly': total_week,
+                'monthly': total_month,
+                'annual': total_year,
+            }
+
+            return Response(general_values)
         else:
             raise Exception("Param Timeframe necesario: daily, weekly or monthly")
 
@@ -1120,7 +1154,6 @@ class ElectronicInvoiceExporter(APIView):
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         file_name = 'FormatoFacturaElectronica-' + start.strftime("%Y-%m-%d_%H_%M_%S") + '-' + end.strftime(
             "%Y-%m-%d_%H_%M_%S") + '.xlsx'
-        print("Filename: ", file_name)
 
         response['Content-Disposition'] = 'attachment; filename=' + file_name
 
