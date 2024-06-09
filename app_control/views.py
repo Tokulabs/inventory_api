@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 
+import boto3
 from django.db.models.functions.window import RowNumber, Rank
 from django.utils import timezone
 from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour, \
@@ -16,6 +17,7 @@ from rest_framework.views import APIView
 from sqlparse.sql import Case
 
 from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, Customer, PaymentMethod
+from inventory_api import settings
 from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
@@ -36,7 +38,7 @@ from django.db.models.functions import Coalesce, TruncMonth, Cast, Now
 from user_control.models import CustomUser
 import csv
 import codecs
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from openpyxl import Workbook
 
 
@@ -1366,3 +1368,53 @@ class InvoicePaymentMethodsView(APIView):
             invoice.save()
 
         return Response({"message": "Métodos de pago actualizados satisfactoriamente"}, status=status.HTTP_200_OK)
+
+
+class UploadFileView(ModelViewSet):
+    http_method_names = ["post"]
+    permission_classes = (IsAuthenticatedCustom, )
+
+    def upload_photo(self, request):
+        file = request.FILES.get("file")
+        if not file:
+            return Response(
+                {"error": "No se ha proporcionado un archivo"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+        aws_access_key = settings.AWS_ACCESS_KEY_ID
+        aws_secret_key = settings.AWS_SECRET_ACCESS_KEY
+        aws_region = settings.AWS_REGION_NAME
+
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key,
+            region_name=aws_region
+        )
+
+        try:
+            response = s3.generate_presigned_post(
+                bucket_name,
+                file.name,
+                Fields={
+                    "Content-Type": file.content_type
+                },
+                Conditions=[
+                    {"Content-Type": file.content_type}
+                ],
+                ExpiresIn=30000
+            )
+
+            data = {
+                "final_url": f"{response['url']}{file.name.replace(' ', '+')}",
+                "endpoint_data": response
+            }
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(data)
