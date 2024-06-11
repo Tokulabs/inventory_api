@@ -4,7 +4,7 @@ from .views import (
     InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
     InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter, InvoiceSimpleListView,
-    HourlySalesQuantities, SalesBySelectedTimeframeSummary, InvoicePaymentMethodsView
+    HourlySalesQuantities, SalesBySelectedTimeframeSummary, InvoicePaymentMethodsView, UploadFileView
 )
 
 from rest_framework.routers import DefaultRouter
@@ -58,5 +58,6 @@ urlpatterns = [
     path('top-selling', SalePerformance.as_view({'post': 'top_selling'}), name='top-selling'),
     path('sales-by-user', SalesByUsersView.as_view({'post': 'sales_by_user'}), name='sales-by-user'),
     path('goals/<int:pk>/', GoalView.as_view({'put': 'update', 'delete': 'destroy'}), name='goal-detail'),
-    path('update-payment-methods', InvoicePaymentMethodsView.as_view(), name='invoice-payment-methods')
+    path('update-payment-methods', InvoicePaymentMethodsView.as_view(), name='invoice-payment-methods'),
+    path('upload-photo/', UploadFileView.as_view({'post': 'upload_photo'}), name='upload-photo')
 ]
