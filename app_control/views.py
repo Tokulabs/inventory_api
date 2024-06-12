@@ -333,36 +333,29 @@ class InvoiceView(ModelViewSet):
         return results
 
     def create(self, request, *args, **kwargs):
-        dian_resolution = DianResolution.objects.filter(active=True).first()
-        if not dian_resolution:
-            raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
-
         try:
-            if not request.data.get("sale_by_id"):
-                request.data.update({"sale_by_id": request.user.id})
+            with transaction.atomic():
+                dian_resolution = DianResolution.objects.filter(active=True).first()
+                if not dian_resolution:
+                    raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
 
-            request.data.update({"created_by_id": request.user.id})
+                if not request.data.get("sale_by_id"):
+                    request.data.update({"sale_by_id": request.user.id})
 
-            new_current_number = dian_resolution.current_number + 1
-            dian_resolution_document_number = dian_resolution.id
-            dian_resolution.current_number = new_current_number
-            dian_resolution.save()
+                request.data.update({"created_by_id": request.user.id})
 
-            request.data.update(
-                {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
-            return super().create(request, *args, **kwargs)
+                new_current_number = dian_resolution.current_number + 1
+                dian_resolution_document_number = dian_resolution.id
+                dian_resolution.current_number = new_current_number
+                dian_resolution.save()
+
+                request.data.update(
+                    {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
+                super().create(request, *args, **kwargs)
+
+                return Response({"message": "Factura creada satisfactoriamente"}, status=status.HTTP_201_CREATED)
         except Exception as e:
-            dian_resolution.current_number -= 1
-            dian_resolution.save()
-            raise e
-
-    def update(self, request, pk=None):
-        invoice = Invoice.objects.filter(pk=pk).first()
-        serializer = self.serializer_class(invoice, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         invoice = Invoice.objects.filter(pk=pk).first()
