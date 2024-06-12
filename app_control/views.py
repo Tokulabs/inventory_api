@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, date
 from decimal import Decimal
 
 import boto3
+from django.db import transaction
 from django.db.models.functions.window import RowNumber, Rank
 from django.utils import timezone
 from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour, \
@@ -332,36 +333,29 @@ class InvoiceView(ModelViewSet):
         return results
 
     def create(self, request, *args, **kwargs):
-        dian_resolution = DianResolution.objects.filter(active=True).first()
-        if not dian_resolution:
-            raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
-
         try:
-            if not request.data.get("sale_by_id"):
-                request.data.update({"sale_by_id": request.user.id})
+            with transaction.atomic():
+                dian_resolution = DianResolution.objects.filter(active=True).first()
+                if not dian_resolution:
+                    raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
 
-            request.data.update({"created_by_id": request.user.id})
+                if not request.data.get("sale_by_id"):
+                    request.data.update({"sale_by_id": request.user.id})
 
-            new_current_number = dian_resolution.current_number + 1
-            dian_resolution_document_number = dian_resolution.id
-            dian_resolution.current_number = new_current_number
-            dian_resolution.save()
+                request.data.update({"created_by_id": request.user.id})
 
-            request.data.update(
-                {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
-            return super().create(request, *args, **kwargs)
+                new_current_number = dian_resolution.current_number + 1
+                dian_resolution_document_number = dian_resolution.id
+                dian_resolution.current_number = new_current_number
+                dian_resolution.save()
+
+                request.data.update(
+                    {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
+                super().create(request, *args, **kwargs)
+
+                return Response({"message": "Factura creada satisfactoriamente"}, status=status.HTTP_201_CREATED)
         except Exception as e:
-            dian_resolution.current_number -= 1
-            dian_resolution.save()
-            raise e
-
-    def update(self, request, pk=None):
-        invoice = Invoice.objects.filter(pk=pk).first()
-        serializer = self.serializer_class(invoice, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         invoice = Invoice.objects.filter(pk=pk).first()
@@ -1364,43 +1358,49 @@ class InvoicePaymentMethodsView(APIView):
     permission_classes = (IsAuthenticatedCustom,)
 
     def post(self, request, *args, **kwargs):
-        invoice_id = request.GET.get('invoice_id', None)
+        try:
+            with transaction.atomic():
+                invoice_id = request.GET.get('invoice_id', None)
 
-        invoice = Invoice.objects.filter(id=invoice_id).first()
-        if invoice is None:
-            return Response({"error": "Factura no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+                invoice = Invoice.objects.filter(id=invoice_id).first()
+                if invoice is None:
+                    raise Exception("Factura no encontrada")
 
-        invoice.payment_methods.all().delete()
+                invoice.payment_methods.all().delete()
 
-        payment_methods = request.data.get("payment_methods", None)
-        if not payment_methods:
-            return Response({"error": "Debe ingresar los métodos de pago"}, status=status.HTTP_400_BAD_REQUEST)
+                payment_methods = request.data.get("payment_methods", None)
+                if not payment_methods:
+                    raise Exception("Debe ingresar los métodos de pago")
 
-        for method in payment_methods:
-            if (method.get("name") is None or method.get("paid_amount") is None or method.get(
-                    "back_amount") is None or method.get("received_amount") is None):
+                for method in payment_methods:
+                    if (method.get("name") is None or method.get("paid_amount") is None or method.get(
+                            "back_amount") is None or method.get("received_amount") is None):
+                        raise Exception(
+                            "Los métodos de pago deben tener nombre, monto pagado, monto de vuelto y monto recibido")
+
+                for method in payment_methods:
+                    PaymentMethod.objects.create(
+                        invoice_id=invoice_id,
+                        name=method.get("name"),
+                        paid_amount=method.get("paid_amount"),
+                        back_amount=method.get("back_amount"),
+                        received_amount=method.get("received_amount"),
+                        transaction_code=method.get("transaction_code", None)
+                    )
+
+                if 'payment_terminal_id' in request.data:
+                    invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
+                    invoice.save()
+
+                if 'is_dollar' in request.data:
+                    invoice.is_dollar = request.data.get("is_dollar", None)
+                    invoice.save()
+
                 return Response(
-                    {"error": "Los métodos de pago deben tener nombre, monto pagado, monto de vuelto y monto recibido"})
-
-        for method in payment_methods:
-            PaymentMethod.objects.create(
-                invoice_id=invoice_id,
-                name=method.get("name"),
-                paid_amount=method.get("paid_amount"),
-                back_amount=method.get("back_amount"),
-                received_amount=method.get("received_amount"),
-                transaction_code=method.get("transaction_code", None)
-            )
-
-        if 'payment_terminal_id' in request.data:
-            invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
-            invoice.save()
-
-        if 'is_dollar' in request.data:
-            invoice.is_dollar = request.data.get("is_dollar", None)
-            invoice.save()
-
-        return Response({"message": "Métodos de pago actualizados satisfactoriamente"}, status=status.HTTP_200_OK)
+                    {"message": "Métodos de pago actualizados satisfactoriamente"},
+                    status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UploadFileView(ModelViewSet):
