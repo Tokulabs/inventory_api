@@ -351,9 +351,10 @@ class InvoiceView(ModelViewSet):
 
                 request.data.update(
                     {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
-                super().create(request, *args, **kwargs)
-
-                return Response({"message": "Factura creada satisfactoriamente"}, status=status.HTTP_201_CREATED)
+                
+                invoice = super().create(request, *args, **kwargs)
+                
+                return Response({"message": "Factura creada satisfactoriamente", "data": invoice.data}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
