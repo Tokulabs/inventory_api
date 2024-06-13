@@ -17,6 +17,7 @@ def add_user_activity(user, action):
         user_id=user.id,
         email=user.email,
         fullname=user.fullname,
+        company_id=user.company_id,
         action=action
     )
 
@@ -28,6 +29,7 @@ class CreateUserView(ModelViewSet):
     permission_classes = (IsAuthenticatedCustom,)
 
     def create(self, request):
+        request.data.update({"company_id": request.user.company_id})
         valid_request = self.serializer_class(data=request.data)
         valid_request.is_valid(raise_exception=True)
 
