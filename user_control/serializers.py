@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Roles, UserActivities, Document_types
+from .models import CustomUser, Roles, UserActivities, Document_types, Company
 
 
 class CreateUserSerializer(serializers.Serializer):
@@ -36,4 +36,10 @@ class CustomUserNamesSerializer(serializers.ModelSerializer):
 class UserActivitiesSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserActivities
+        fields = ("__all__")
+
+
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
         fields = ("__all__")

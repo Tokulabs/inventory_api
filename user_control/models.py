@@ -66,3 +66,17 @@ class UserActivities(models.Model):
 
     def __str__(self):
         return f"{self.fullname}{self.action} on {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class Company(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    dian_token = models.CharField(max_length=255, unique=True)
+    nit = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("created_at", )
+
+    def __str__(self):
+        return self.name

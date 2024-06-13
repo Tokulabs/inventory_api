@@ -1,6 +1,9 @@
 from rest_framework.viewsets import ModelViewSet
+
+from .models import Company
 from .serializers import (CreateUserSerializer, CustomUser,
-                          LoginSerializer, UpdatePasswordSerializer, CustomUserSerializer, UserActivitiesSerializer, UserActivities)
+                          LoginSerializer, UpdatePasswordSerializer, CustomUserSerializer, UserActivitiesSerializer,
+                          UserActivities, CompanySerializer)
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
@@ -22,7 +25,7 @@ class CreateUserView(ModelViewSet):
     http_method_names = ["post"]
     queryset = CustomUser.objects.all()
     serializer_class = CreateUserSerializer
-    permission_classes = (IsAuthenticatedCustom, )
+    permission_classes = (IsAuthenticatedCustom,)
 
     def create(self, request):
         valid_request = self.serializer_class(data=request.data)
@@ -113,7 +116,7 @@ class MeView(ModelViewSet):
     serializer_class = CustomUserSerializer
     http_method_names = ["get"]
     queryset = CustomUser.objects.all()
-    permission_classes = (IsAuthenticatedCustom, )
+    permission_classes = (IsAuthenticatedCustom,)
 
     def list(self, request):
         data = self.serializer_class(request.user).data
@@ -124,7 +127,7 @@ class UserActivitiesView(ModelViewSet):
     serializer_class = UserActivitiesSerializer
     http_method_names = ["get"]
     queryset = UserActivities.objects.all()
-    permission_classes = (IsAuthenticatedCustom, )
+    permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
 
     def get_queryset(self):
@@ -150,7 +153,7 @@ class UsersView(ModelViewSet):
     serializer_class = CustomUserSerializer
     queryset = CustomUser.objects.all()
     http_method_names = ("get", "put", "post")
-    permission_classes = (IsAuthenticatedCustom, )
+    permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
 
     def get_queryset(self):
@@ -160,7 +163,7 @@ class UsersView(ModelViewSet):
         keyword = data.pop("keyword", None)
         data.pop("page", None)
         results = self.queryset.filter(is_superuser=False, **data)
-        
+
         if keyword:
             search_fields = ("fullname", "email", "role")
             query = get_query(keyword, search_fields)
@@ -185,3 +188,25 @@ class UsersView(ModelViewSet):
 
         serializer = self.serializer_class(user)
         return Response(serializer.data)
+
+
+class CompanyView(ModelViewSet):
+    serializer_class = CompanySerializer
+    queryset = Company.objects.all()
+    http_method_names = ("get", "post", "put", "delete")
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        if self.request.method.lower() != "get":
+            return Company.objects.all()
+        data = self.request.query_params.dict()
+        keyword = data.pop("keyword", None)
+        data.pop("page", None)
+        results = self.queryset.filter(**data)
+
+        if keyword:
+            search_fields = ("fullname", "email", "role")
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+        return results
