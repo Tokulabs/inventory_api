@@ -3,7 +3,7 @@ from django.contrib.auth.models import (
     AbstractBaseUser, PermissionsMixin, BaseUserManager)
 
 Roles = (("admin", "admin"), ("posAdmin", "posAdmin"), ("shopAdmin",
-         "shopAdmin"), ("sales", "sales"), ("supportSales", "supportSales"))
+         "shopAdmin"), ("sales", "sales"), ("supportSales", "supportSales"), ("storageAdmin", "storageAdmin"))
 
 Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
                   ("CE", "CC"), ("TI", "TI"))
