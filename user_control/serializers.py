@@ -44,6 +44,9 @@ class CustomUserNamesSerializer(serializers.ModelSerializer):
 
 
 class UserActivitiesSerializer(serializers.ModelSerializer):
+    company = CompanySerializer(read_only=True)
+    company_id = serializers.IntegerField(write_only=True, required=True)
+
     class Meta:
         model = UserActivities
         fields = ("__all__")
