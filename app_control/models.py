@@ -34,13 +34,11 @@ class InventoryGroup(models.Model):
         if self.pk is not None:
             action = f"updated group from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
-        add_user_activity(self.created_by, action=action)
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
         action = f"deleted group - '{self.name}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
     def __str__(self):
         return self.name
@@ -74,13 +72,11 @@ class Provider(models.Model):
         if self.pk is not None:
             action = f"updated provider from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
-        add_user_activity(self.created_by, action=action)
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
         action = f"deleted provider - '{self.name}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
     def __str__(self):
         return self.name
@@ -123,13 +119,10 @@ class Inventory(models.Model):
         if not is_new:
             action = f"updated inventory item with code - '{self.code}'"
 
-        add_user_activity(self.created_by, action=action)
-
     def delete(self, *args, **kwargs):
         created_by = self.created_by
         action = f"deleted inventory - '{self.code}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
     def __str__(self):
         return f"{self.name} - {self.code}"
@@ -162,13 +155,11 @@ class Customer(models.Model):
         if self.pk is not None:
             action = f"updated customer from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
-        add_user_activity(self.created_by, action=action)
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
         action = f"deleted customer - '{self.name}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
     def __str__(self):
         return self.name
@@ -195,7 +186,6 @@ class PaymentTerminal(models.Model):
         action = f"added new payment terminal with name - '{self.name}'"
         if not is_new:
             action = f"updated payment terminal item with name - '{self.name}'"
-        add_user_activity(self.created_by, action=action)
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
@@ -252,7 +242,6 @@ class Invoice(models.Model):
         created_by = self.created_by
         action = f"deleted invoice - '{self.id}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
 
 class PaymentMethod(models.Model):

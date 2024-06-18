@@ -30,8 +30,10 @@ class CreateUserView(ModelViewSet):
 
         CustomUser.objects.create(**valid_request.validated_data)
 
-        add_user_activity(request.user, "add new user")
+        print(request.user.fullname)
 
+        add_user_activity(request.user, f"Nuevo usuario creado por: '{request.user.fullname}'")
+        
         return Response(
             {"success": "Usuario creado satisfactoriamente"},
             status=status.HTTP_201_CREATED
@@ -79,7 +81,7 @@ class LoginView(ModelViewSet):
         user.last_login = datetime.now()
         user.save()
 
-        add_user_activity(user, "logged in")
+        add_user_activity(user, f"'{user.fullname}' inició sesión el '{user.last_login}'")
 
         return Response({"access": access})
 
@@ -104,7 +106,7 @@ class UpdatePasswordView(ModelViewSet):
         user.set_password(valid_request._validated_data["password"])
         user.save()
 
-        add_user_activity(user, "update password")
+        add_user_activity(user, f"El usuario '{user.fullname}' actualizó su contraseña")
 
         return Response({"success": "Contraseña actualizada"})
 
