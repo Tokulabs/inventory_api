@@ -682,6 +682,7 @@ class SalesByUsersView(ModelViewSet):
                 Invoice.objects.select_related("InvoiceItems", "sale_by")
                 .all()
                 .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
                 .values(
                     "sale_by__id",
                     "sale_by__fullname",
@@ -696,6 +697,7 @@ class SalesByUsersView(ModelViewSet):
                 Invoice.objects.select_related("InvoiceItems", "sale_by")
                 .all()
                 .filter(is_override=False)
+                .filter(invoice_items__is_gift=False)
                 .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
                 .values(
                     "sale_by__id",
@@ -736,8 +738,7 @@ class PurchaseView(ModelViewSet):
             amount_total_no_gifts=Sum(F('amount'), filter=Q(is_gift=False)),
             total=Coalesce(Sum(F('quantity'), filter=Q(is_gift=False)), 0),
             gift_total=Coalesce(Sum(F('quantity'), filter=Q(is_gift=True)), 0),
-            amount_total_usd=Sum(F('usd_amount'),
-                                 filter=Q(invoice__is_dollar=True, invoice__is_override=False)),
+            amount_total_usd=Sum(F('usd_amount'), filter=Q(invoice__is_dollar=True, is_gift=False)),
             amount_total_gifts=Sum(F('amount'), filter=Q(is_gift=True))
         )
 
@@ -1074,6 +1075,7 @@ class ItemsReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=True)
+            .filter(invoice_items__is_gift=False)
             .values_list("invoice_items__item_code", "invoice_items__item_name")
             .annotate(
                 quantity=Sum("invoice_items__quantity"),
@@ -1120,6 +1122,7 @@ class InvoicesReportExporter(APIView):
             .all()
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
+            .filter(invoice_items__is_gift=False)
             .annotate(
                 total_invoice=Sum("invoice_items__amount"),
             )
