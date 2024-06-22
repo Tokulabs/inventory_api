@@ -58,7 +58,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     last_login = models.DateTimeField(null=True)
     daily_goal = models.FloatField(default=0.0)
     company = models.ForeignKey(
-        Company, null=False, related_name="user_company",
+        Company, null=True, related_name="user_company",
         on_delete=models.DO_NOTHING
     )
 
@@ -80,7 +80,7 @@ class UserActivities(models.Model):
     action = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     company = models.ForeignKey(
-        Company, null=False, related_name="activities_company",
+        Company, null=True, related_name="activities_company",
         on_delete=models.DO_NOTHING
     )
 
