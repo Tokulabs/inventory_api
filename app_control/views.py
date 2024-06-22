@@ -41,6 +41,7 @@ import csv
 import codecs
 from django.http import HttpResponse, JsonResponse
 from openpyxl import Workbook
+from user_control.views import add_user_activity
 
 
 class InventoryView(ModelViewSet):
@@ -72,6 +73,7 @@ class InventoryView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        add_user_activity(request.user, f"{request.user.fullname} creó el producto con id: {request.data.get('code')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -79,12 +81,14 @@ class InventoryView(ModelViewSet):
         serializer = self.serializer_class(inventory, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            add_user_activity(request.user, f"{request.user.fullname} actualizó el producto: {inventory.code}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         inventory = Inventory.objects.filter(pk=pk).first()
         inventory.delete()
+        add_user_activity(request.user, f"{request.user.fullname} eliminó el producto con id: {inventory.code}")
         return Response({"message": "Producto eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -122,6 +126,7 @@ class ProviderView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        add_user_activity(request.user, f"{request.user.fullname} creó el proveedor: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk):
@@ -129,12 +134,14 @@ class ProviderView(ModelViewSet):
         serializer = self.serializer_class(provider, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            add_user_activity(request.user, f"{request.user.fullname} actualizó el proveedor: {request.data.get('name')}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
         provider = Provider.objects.filter(pk=pk).first()
         provider.delete()
+        add_user_activity(request.user, f"{request.user.fullname} eliminó el proveedor: {provider}")
         return Response({"message": "Proveedor eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -176,11 +183,13 @@ class CustomerView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        add_user_activity(request.user, f"{request.user.fullname} creó el cliente: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def destroy(self, request, pk):
         customer = Customer.objects.filter(pk=pk).first()
         customer.delete()
+        add_user_activity(request.user, f"{request.user.fullname} creó el cliente: {customer}")
         return Response({"message": "Cliente eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
@@ -215,6 +224,7 @@ class InventoryGroupView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        add_user_activity(request.user, f"{request.user.fullname} creó una nueva categoría: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -222,12 +232,14 @@ class InventoryGroupView(ModelViewSet):
         serializer = self.serializer_class(inventory_group, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            add_user_activity(request.user, f"{request.user.fullname} actualizó la categoría: {request.data.get('name')}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, pk=None):
+    def destroy(self, request, pk=None):        
         inventory_group = InventoryGroup.objects.filter(pk=pk).first()
         inventory_group.delete()
+        add_user_activity(request.user, f"{request.user.fullname} eliminó la categoría: {inventory_group}")
         return Response({"message": "Categoría eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -279,6 +291,7 @@ class PaymentTerminalView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        add_user_activity(request.user, f"{request.user.fullname} creó el datafono: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -286,11 +299,13 @@ class PaymentTerminalView(ModelViewSet):
         serializer = self.serializer_class(terminal, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            add_user_activity(request.user, f"{request.user.fullname} actualizó el datafono: {request.data.get('name')}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        add_user_activity(request.user, f"{request.user.fullname} eliminó el datafono: {terminal}")
         terminal.delete()
         return Response({"message": "Datafono eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -353,6 +368,8 @@ class InvoiceView(ModelViewSet):
                     {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
                 
                 invoice = super().create(request, *args, **kwargs)
+
+                add_user_activity(request.user, f"{request.user.fullname} creó la factura: {request.data.get('invoice_number')}")
                 
                 return Response({"message": "Factura creada satisfactoriamente", "data": invoice.data}, status=status.HTTP_201_CREATED)
         except Exception as e:
@@ -360,6 +377,7 @@ class InvoiceView(ModelViewSet):
 
     def destroy(self, request, pk=None):
         invoice = Invoice.objects.filter(pk=pk).first()
+        add_user_activity(request.user, f"{request.user.fullname} eliminó la factura: {invoice.invoice_number}")
         invoice.delete()
         return Response({"message": "Factura eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -416,7 +434,7 @@ class UpdateInvoiceView(APIView):
 
         # Guardar los cambios en la base de datos
         invoice.save()
-
+        add_user_activity(request.user, f"{request.user.fullname} actualizó la factura: {invoice.invoice_number}")
         return Response({"message": "Factura actualizada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
@@ -804,6 +822,8 @@ class InventoryCSVLoaderView(ModelViewSet):
         data_validation.is_valid(raise_exception=True)
         data_validation.save()
 
+        add_user_activity(request.user, f"{request.user.fullname} ingresó productos mediante archivo CSV")
+        
         return Response({
             "success": "Productos creados satisfactoriamente"
         })
@@ -848,7 +868,7 @@ class DianResolutionView(ModelViewSet):
         if DianResolution.objects.all().filter(active=True).exists():
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
-
+        add_user_activity(request.user, f"{request.user.fullname} creó una nueva resolución '{request.data.get('document_number')}' valida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -863,10 +883,13 @@ class DianResolutionView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+
+        add_user_activity(request.user, f"{request.user.fullname} actualizó la resolución '{request.data.get('document_number')}'")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         dian_res = DianResolution.objects.filter(pk=pk).first()
+        add_user_activity(request.user, f"{request.user.fullname} eliminó la resolución '{dian_res.document_number}'")
         dian_res.delete()
         return Response({"message": "Resolución DIAN eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -885,6 +908,12 @@ class DianResolutionView(ModelViewSet):
         resolution.active = not resolution.active
         resolution.save()
         serializer = self.serializer_class(resolution)
+
+        if resolution.active == True:
+            add_user_activity(request.user, f"{request.user.fullname} activó la resolución '{resolution.document_number}'")
+        else:
+            add_user_activity(request.user, f"{request.user.fullname} desactivó la resolución '{resolution.document_number}'")
+
         return Response(serializer.data)
 
 
@@ -997,6 +1026,7 @@ class ReportExporter(APIView):
         apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
 
         wb.save(response)
+        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte diario de ventas el {datetime.now()}")
         return response
 
 
@@ -1036,6 +1066,8 @@ class InventoriesReportExporter(APIView):
         create_inventory_report(ws, inventories_report_data)
 
         wb.save(response)
+
+        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de inventarios el {datetime.now()}")
         return response
 
 
@@ -1097,6 +1129,8 @@ class ItemsReportExporter(APIView):
         create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date)
 
         wb.save(response)
+
+        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de ventas de productos el {datetime.now()}")
         return response
 
 
@@ -1137,6 +1171,8 @@ class InvoicesReportExporter(APIView):
         create_invoices_report(ws, inventories_report_data)
 
         wb.save(response)
+
+        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de facturación el {datetime.now()}")
         return response
 
 
@@ -1311,6 +1347,7 @@ class ElectronicInvoiceExporter(APIView):
 
         wb.save(response)
 
+        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de facturación electrónica el {datetime.now()}")
         return response
 
 
@@ -1341,18 +1378,46 @@ class GoalView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+
+        if request.data.get('goal_type') == 'diary':
+            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta diaria de {request.data.get('goal_value')}")
+        elif request.data.get('goal_type') == 'weekly':
+            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta semanal de {request.data.get('goal_value')}")
+        elif request.data.get('goal_type') == 'monthly':
+            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta mensual de {request.data.get('goal_value')}")
+        elif request.data.get('goal_type') == 'annual':
+            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta anual de {request.data.get('goal_value')}")
+        
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         goal = Goals.objects.filter(pk=pk).first()
         serializer = self.serializer_class(goal, data=request.data)
         if serializer.is_valid():
+            if request.data.get('goal_value') != goal.goal_value:
+                if request.data.get('goal_type') == 'diary':
+                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta diaria de {goal.goal_value} a {request.data.get('goal_value')}")
+                elif request.data.get('goal_type') == 'weekly':
+                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta semanal de {goal.goal_value} a {request.data.get('goal_value')}")
+                elif request.data.get('goal_type') == 'monthly':
+                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta mensual de {goal.goal_value} a {request.data.get('goal_value')}")
+                elif request.data.get('goal_type') == 'annual':
+                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta anual de {goal.goal_value} a {request.data.get('goal_value')}")
             serializer.save()
             return Response(serializer.data)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         goal = Goals.objects.filter(pk=pk).first()
+        if goal.goal_type == 'diary':
+            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta diaria de {request.data.get('goal_value')}")
+        elif goal.goal_type == 'weekly':
+            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta semanal de {request.data.get('goal_value')}")
+        elif goal.goal_type == 'monthly':
+            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta mensual de {request.data.get('goal_value')}")
+        elif goal.goal_type == 'annual':
+            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta anual de {request.data.get('goal_value')}")
         goal.delete()
         return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -1370,6 +1435,11 @@ class InvoicePaymentMethodsView(APIView):
                 if invoice is None:
                     raise Exception("Factura no encontrada")
 
+                old_payment_methods = []
+
+                for query in invoice.payment_methods.all():
+                    old_payment_methods.append(query.name)
+                
                 invoice.payment_methods.all().delete()
 
                 payment_methods = request.data.get("payment_methods", None)
@@ -1382,6 +1452,7 @@ class InvoicePaymentMethodsView(APIView):
                         raise Exception(
                             "Los métodos de pago deben tener nombre, monto pagado, monto de vuelto y monto recibido")
 
+                new_payment_methods = []
                 for method in payment_methods:
                     PaymentMethod.objects.create(
                         invoice_id=invoice_id,
@@ -1391,6 +1462,9 @@ class InvoicePaymentMethodsView(APIView):
                         received_amount=method.get("received_amount"),
                         transaction_code=method.get("transaction_code", None)
                     )
+                    new_payment_methods.append(method.get("name"))
+                
+                add_user_activity(request.user, f"{request.user.fullname} actualizó los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
 
                 if 'payment_terminal_id' in request.data:
                     invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)

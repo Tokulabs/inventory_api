@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import (
-    CreateUserView, LoginView, UpdatePasswordView, MeView, UserActivitiesView, UsersView
+    CreateUserView, LoginView, UpdatePasswordView, MeView, UserActivitiesView, UsersView, CompanyView
 )
 
 from rest_framework.routers import DefaultRouter
@@ -13,6 +13,7 @@ router.register("update-password", UpdatePasswordView, 'update password')
 router.register("me", MeView, 'me')
 router.register("activities", UserActivitiesView, 'activities log')
 router.register("users", UsersView, 'users')
+router.register("company", CompanyView, 'company')
 
 urlpatterns = [
     path("", include(router.urls)),

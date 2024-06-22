@@ -8,6 +8,21 @@ Roles = (("admin", "admin"), ("posAdmin", "posAdmin"), ("shopAdmin",
 Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
                   ("CE", "CC"), ("TI", "TI"))
 
+
+class Company(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    dian_token = models.CharField(max_length=255, unique=True)
+    nit = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("created_at", )
+
+    def __str__(self):
+        return self.name
+
+
 class CustomUserManager(BaseUserManager):
     def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault('is_staff', True)
@@ -42,6 +57,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True, null=False)
     last_login = models.DateTimeField(null=True)
     daily_goal = models.FloatField(default=0.0)
+    company = models.ForeignKey(
+        Company, null=True, related_name="user_company",
+        on_delete=models.DO_NOTHING
+    )
 
     USERNAME_FIELD = "email"
     objects = CustomUserManager()
@@ -60,6 +79,10 @@ class UserActivities(models.Model):
     fullname = models.CharField(max_length=255)
     action = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    company = models.ForeignKey(
+        Company, null=True, related_name="activities_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at", )
