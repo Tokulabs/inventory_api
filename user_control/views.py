@@ -175,10 +175,12 @@ class UsersView(ModelViewSet):
         return results
 
     def update(self, request, pk=None):
+        request.data.update({"company_id": request.user.company_id})
         user = CustomUser.objects.filter(pk=pk).first()
         serializer = self.serializer_class(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            add_user_activity(request.user, f"Usuario '{request.user.fullname}' Actualizado")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
