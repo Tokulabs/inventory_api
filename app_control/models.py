@@ -1,5 +1,5 @@
 from django.db import models
-from user_control.models import CustomUser
+from user_control.models import CustomUser, Company
 from user_control.views import add_user_activity
 
 PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
@@ -21,6 +21,10 @@ class InventoryGroup(models.Model):
     active = models.BooleanField(default=True, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    company = models.ForeignKey(
+        Company, null=True, related_name="inventory_group_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -59,6 +63,10 @@ class Provider(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True, null=False)
+    company = models.ForeignKey(
+        Company, null=True, related_name="provider_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -105,6 +113,10 @@ class Inventory(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True, null=False)
+    company = models.ForeignKey(
+        Company, null=True, related_name="inventory_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("code",)
@@ -142,6 +154,10 @@ class Customer(models.Model):
     city = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    company = models.ForeignKey(
+        Company, null=True, related_name="customer_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -176,6 +192,10 @@ class PaymentTerminal(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True, null=False)
+    company = models.ForeignKey(
+        Company, null=True, related_name="payment_terminal_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -207,6 +227,10 @@ class DianResolution(models.Model):
     to_number = models.PositiveIntegerField()
     current_number = models.PositiveIntegerField(default=None)
     active = models.BooleanField(default=True, null=False)
+    company = models.ForeignKey(
+        Company, null=True, related_name="resolution_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -234,6 +258,10 @@ class Invoice(models.Model):
     dian_resolution = models.ForeignKey(
         DianResolution, related_name="dian_resolution", null=True, on_delete=models.SET_NULL)
     is_override = models.BooleanField(default=False)
+    company = models.ForeignKey(
+        Company, null=True, related_name="invoice_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -254,6 +282,10 @@ class PaymentMethod(models.Model):
     received_amount = models.FloatField()
     transaction_code = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    company = models.ForeignKey(
+        Company, null=True, related_name="payment_method_company",
+        on_delete=models.DO_NOTHING
+    )
 
     class Meta:
         ordering = ("-created_at",)
@@ -276,6 +308,10 @@ class InvoiceItem(models.Model):
     original_amount = models.FloatField(null=True)
     original_usd_amount = models.FloatField(null=True)
     is_gift = models.BooleanField(default=False)
+    company = models.ForeignKey(
+        Company, null=True, related_name="invoice_item_company",
+        on_delete=models.DO_NOTHING
+    )
 
     def save(self, *args, **kwargs):
         if self.item.total_in_shops < self.quantity:
@@ -312,6 +348,10 @@ class Goals(models.Model):
 
     goal_type = models.CharField(max_length=20, choices=GOAL_TYPE_CHOICES, unique=True)
     goal_value = models.FloatField()
+    company = models.ForeignKey(
+        Company, null=True, related_name="goals_company",
+        on_delete=models.DO_NOTHING
+    )
 
     def __str__(self):
         return f"{self.get_goal_type_display()} - {self.goal_value}"
