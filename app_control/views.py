@@ -73,10 +73,12 @@ class InventoryView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
         add_user_activity(request.user, f"{request.user.fullname} creó el producto con id: {request.data.get('code')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
+        request.data.update({"company_id": request.user.company_id})
         inventory = Inventory.objects.filter(pk=pk).first()
         serializer = self.serializer_class(inventory, data=request.data)
         if serializer.is_valid():
@@ -126,10 +128,12 @@ class ProviderView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
         add_user_activity(request.user, f"{request.user.fullname} creó el proveedor: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk):
+        request.data.update({"company_id": request.user.company_id})
         provider = Provider.objects.filter(pk=pk).first()
         serializer = self.serializer_class(provider, data=request.data)
         if serializer.is_valid():
@@ -183,8 +187,19 @@ class CustomerView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
         add_user_activity(request.user, f"{request.user.fullname} creó el cliente: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
+
+    def update(self, request, pk):
+        request.data.update({"company_id": request.user.company_id})
+        customer = Customer.objects.filter(pk=pk).first()
+        serializer = self.serializer_class(customer, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            add_user_activity(request.user, f"Actualizar cliente: {request.data.get('name')}")
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
         customer = Customer.objects.filter(pk=pk).first()
@@ -224,10 +239,12 @@ class InventoryGroupView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
         add_user_activity(request.user, f"{request.user.fullname} creó una nueva categoría: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
+        request.data.update({"company_id": request.user.company_id})
         inventory_group = InventoryGroup.objects.filter(pk=pk).first()
         serializer = self.serializer_class(inventory_group, data=request.data)
         if serializer.is_valid():
@@ -291,10 +308,12 @@ class PaymentTerminalView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
         add_user_activity(request.user, f"{request.user.fullname} creó el datafono: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
+        request.data.update({"company_id": request.user.company_id})
         terminal = PaymentTerminal.objects.filter(pk=pk).first()
         serializer = self.serializer_class(terminal, data=request.data)
         if serializer.is_valid():
@@ -350,6 +369,7 @@ class InvoiceView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
+                request.data.update({"company_id": request.user.company_id})
                 dian_resolution = DianResolution.objects.filter(active=True).first()
                 if not dian_resolution:
                     raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
@@ -864,6 +884,7 @@ class DianResolutionView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
 
         if DianResolution.objects.all().filter(active=True).exists():
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
@@ -872,6 +893,7 @@ class DianResolutionView(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
+        request.data.update({"company_id": request.user.company_id})
         dian_res = DianResolution.objects.filter(pk=pk).first()
         serializer = self.serializer_class(dian_res, data=request.data)
 
@@ -1378,6 +1400,7 @@ class GoalView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
+        request.data.update({"company_id": request.user.company_id})
 
         if request.data.get('goal_type') == 'diary':
             add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta diaria de {request.data.get('goal_value')}")
@@ -1391,6 +1414,7 @@ class GoalView(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
+        request.data.update({"company_id": request.user.company_id})
         goal = Goals.objects.filter(pk=pk).first()
         serializer = self.serializer_class(goal, data=request.data)
         if serializer.is_valid():
@@ -1429,6 +1453,7 @@ class InvoicePaymentMethodsView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
+                request.data.update({"company_id": request.user.company_id})
                 invoice_id = request.GET.get('invoice_id', None)
 
                 invoice = Invoice.objects.filter(id=invoice_id).first()
@@ -1460,7 +1485,8 @@ class InvoicePaymentMethodsView(APIView):
                         paid_amount=method.get("paid_amount"),
                         back_amount=method.get("back_amount"),
                         received_amount=method.get("received_amount"),
-                        transaction_code=method.get("transaction_code", None)
+                        transaction_code=method.get("transaction_code", None),
+                        company_id=request.user.company_id
                     )
                     new_payment_methods.append(method.get("name"))
                 
