@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import UniqueConstraint
 from user_control.models import CustomUser, Company
 from user_control.views import add_user_activity
 
@@ -95,7 +96,7 @@ class Inventory(models.Model):
         CustomUser, null=True, related_name="inventory_items",
         on_delete=models.SET_NULL
     )
-    code = models.CharField(max_length=10, unique=True, null=True)
+    code = models.CharField(max_length=10, null=True)
     photo = models.TextField(blank=True, null=True)
     provider = models.ForeignKey(
         Provider, related_name="providers", null=True, on_delete=models.SET_NULL
@@ -120,6 +121,9 @@ class Inventory(models.Model):
 
     class Meta:
         ordering = ("code",)
+        constraints = [
+            UniqueConstraint(fields=["code", "company"], name="unique_code")
+        ]
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
