@@ -21,12 +21,11 @@ from .views import InventoryView, InventoryGroupView, InvoiceView
 class SummaryView(ModelViewSet):
     http_method_names = ('get',)
     permission_classes = (IsAuthenticatedCustom,)
-    queryset = InventoryView.queryset
 
     def list(self, request, *args, **kwargs):
-        total_inventory = filter_company(self.queryset, self.request.user.company_id).filter(active=True).count()
-        total_group = InventoryGroupView.queryset.filter(active=True).count()
-        total_users = CustomUser.objects.filter(is_superuser=False).filter(is_active=True).count()
+        total_inventory = filter_company(InventoryView.queryset, self.request.user.company_id).filter(active=True).count()
+        total_group = filter_company(InventoryGroupView.queryset, self.request.user.company_id).filter(active=True).count()
+        total_users = filter_company(CustomUser.objects, self.request.user.company_id).filter(is_superuser=False).filter(is_active=True).count()
 
         return Response({
             "total_inventory": total_inventory,
