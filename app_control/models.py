@@ -1,20 +1,23 @@
 from django.db import models
 from django.db.models import UniqueConstraint
+
 from user_control.models import CustomUser, Company
 from user_control.views import add_user_activity
 
 PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
-                                                                   "debitCard"), ("nequi", "nequi"), ("bankTransfer", "bankTransfer"))
+                                                                   "debitCard"), ("nequi", "nequi"),
+                  ("bankTransfer", "bankTransfer"))
 
 Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
                   ("CE", "CC"), ("TI", "TI"), ("DIE", "DIE"))
+
 
 class InventoryGroup(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="inventory_groups",
         on_delete=models.SET_NULL
     )
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     belongs_to = models.ForeignKey(
         'self', null=True, on_delete=models.SET_NULL,
         related_name="group_relation"
@@ -29,6 +32,9 @@ class InventoryGroup(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            UniqueConstraint(fields=["name", "company"], name="unique_group_name")
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -54,7 +60,7 @@ class Provider(models.Model):
         CustomUser, null=True, related_name="providers",
         on_delete=models.SET_NULL
     )
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     legal_name = models.CharField(max_length=100, null=True)
     nit = models.CharField(max_length=20, null=True)
     phone = models.CharField(max_length=20, null=True)
@@ -71,6 +77,9 @@ class Provider(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            UniqueConstraint(fields=["name", "company"], name="unique_provider_name")
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -149,7 +158,7 @@ class Customer(models.Model):
         CustomUser, null=True, related_name="customers",
         on_delete=models.SET_NULL
     )
-    document_id = models.CharField(max_length=20, unique=True)
+    document_id = models.CharField(max_length=20)
     document_type = models.CharField(max_length=3, choices=Document_types, default="CC")
     name = models.CharField(max_length=50)
     phone = models.CharField(max_length=20, null=True)
@@ -165,6 +174,9 @@ class Customer(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            UniqueConstraint(fields=["document_id", "company"], name="unique_customer_document_id")
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -191,7 +203,7 @@ class PaymentTerminal(models.Model):
         on_delete=models.SET_NULL
     )
     account_code = models.CharField(max_length=200)
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     is_wireless = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -203,6 +215,9 @@ class PaymentTerminal(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            UniqueConstraint(fields=["name", "company"], name="unique_name+")
+        ]
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -224,7 +239,7 @@ class DianResolution(models.Model):
         on_delete=models.SET_NULL
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    document_number = models.CharField(max_length=255, unique=True)
+    document_number = models.CharField(max_length=255)
     from_date = models.DateField()
     to_date = models.DateField()
     from_number = models.PositiveIntegerField()
@@ -238,6 +253,9 @@ class DianResolution(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            UniqueConstraint(fields=["document_number", "company"], name="unique_dian_document_number")
+        ]
 
     def save(self, *args, **kwargs):
         if self.pk is None:  # se está creando un nuevo objeto
@@ -258,7 +276,7 @@ class Invoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     sale_by = models.ForeignKey(
         CustomUser, related_name="sale_by", null=True, on_delete=models.SET_NULL)
-    invoice_number = models.CharField(max_length=255, unique=True, null=True)
+    invoice_number = models.CharField(max_length=255, null=True)
     dian_resolution = models.ForeignKey(
         DianResolution, related_name="dian_resolution", null=True, on_delete=models.SET_NULL)
     is_override = models.BooleanField(default=False)
@@ -269,6 +287,9 @@ class Invoice(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            UniqueConstraint(fields=["invoice_number", "company"], name="unique_invoice")
+        ]
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
@@ -336,13 +357,14 @@ class InvoiceItem(models.Model):
 
     def __str__(self):
         return f"{self.item_code} - {self.quantity}"
-    
+
+
 class Goals(models.Model):
     DIARY = 'diary'
     WEEKLY = 'weekly'
     MONTHLY = 'monthly'
     ANNUAL = 'annual'
-    
+
     GOAL_TYPE_CHOICES = [
         (DIARY, 'Diary'),
         (WEEKLY, 'Weekly'),
@@ -350,12 +372,17 @@ class Goals(models.Model):
         (ANNUAL, 'Annual'),
     ]
 
-    goal_type = models.CharField(max_length=20, choices=GOAL_TYPE_CHOICES, unique=True)
+    goal_type = models.CharField(max_length=20, choices=GOAL_TYPE_CHOICES)
     goal_value = models.FloatField()
     company = models.ForeignKey(
         Company, null=True, related_name="goals_company",
         on_delete=models.DO_NOTHING
     )
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(fields=["goal_type", "company"], name="unique_goal_type")
+        ]
 
     def __str__(self):
         return f"{self.get_goal_type_display()} - {self.goal_value}"

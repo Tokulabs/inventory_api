@@ -1,47 +1,26 @@
-import json
-from datetime import datetime, timedelta, date
-from decimal import Decimal
+from datetime import date
 
 import boto3
 from django.db import transaction
-from django.db.models.functions.window import RowNumber, Rank
-from django.utils import timezone
-from django.db.models.functions.datetime import TruncYear, TruncDay, TruncHour, TruncMinute, TruncSecond, ExtractHour, \
-    ExtractDay, ExtractMonth, ExtractWeek
-from django.db.models.functions.text import Upper, Concat
 from inventory_api.middlewares import CompanyFilterBackend
-from openpyxl.styles import Font, Alignment
-from openpyxl.styles.fills import PatternFill
-from openpyxl.utils import get_column_letter
-
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
-from sqlparse.sql import Case
 
-from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, Customer, PaymentMethod
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod
 from inventory_api import settings
-from inventory_api.excel_manager import apply_styles_to_cells
 
 from .serializers import (
     GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
-    Invoice, InvoiceSerializer,
-    InvoiceItem, DianSerializer, PaymentTerminalSerializer, ProviderSerializer, UserWithAmountSerializer,
+    Invoice, InvoiceSerializer, DianSerializer, PaymentTerminalSerializer, ProviderSerializer,
     Customer, CustomerSerializer, InvoiceSimpleSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
-from inventory_api.utils import CustomPagination, get_query, create_terminals_report, create_dollars_report, \
-    create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
-    electronic_invoice_report, clients_report, electronic_invoice_report_by_invoice
-from django.db.models import Count, Sum, F, Q, Value, CharField, Func, ExpressionWrapper, Subquery, OuterRef, \
-    DecimalField, IntegerField, When, Case, Window
-from django.db.models.functions import Coalesce, TruncMonth, Cast, Now
-from user_control.models import CustomUser
+from inventory_api.utils import CustomPagination, get_query, filter_company
+from django.db.models import Count, Sum
 import csv
 import codecs
-from django.http import HttpResponse, JsonResponse
-from openpyxl import Workbook
 from user_control.views import add_user_activity
 
 
@@ -51,17 +30,12 @@ class InventoryView(ModelViewSet):
     serializer_class = InventorySerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
-    filter_backends = (CompanyFilterBackend, )
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        for backend in list(self.filter_backends):
-            queryset = backend().filter_queryset(self.request, queryset, self)
-
         data = self.request.query_params.dict()
         data.pop("page", None)
         keyword = data.pop("keyword", None)
-        results = queryset.filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
         if keyword:
             search_fields = (
                 "code", "created_by__fullname", "created_by__email",
@@ -80,6 +54,10 @@ class InventoryView(ModelViewSet):
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
         inventory = self.get_queryset().filter(pk=pk).first()
+
+        if inventory is None:
+            return Response({'error': 'Producto no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(inventory, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -115,7 +93,7 @@ class ProviderView(ModelViewSet):
         data = self.request.query_params.dict()
         keyword = data.pop("keyword", None)
         data.pop("page", None)
-        results = self.queryset.filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
 
         if keyword:
             search_fields = (
@@ -134,22 +112,27 @@ class ProviderView(ModelViewSet):
 
     def update(self, request, pk):
         request.data.update({"company_id": request.user.company_id})
-        provider = Provider.objects.filter(pk=pk).first()
+        provider = self.get_queryset().filter(pk=pk).first()
+
+        if provider is None:
+            return Response({'error': 'Proveedor no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(provider, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"{request.user.fullname} actualizó el proveedor: {request.data.get('name')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} actualizó el proveedor: {request.data.get('name')}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
-        provider = Provider.objects.filter(pk=pk).first()
+        provider = self.get_queryset().filter(pk=pk).first()
         provider.delete()
         add_user_activity(request.user, f"{request.user.fullname} eliminó el proveedor: {provider}")
         return Response({"message": "Proveedor eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
-        provider = Provider.objects.filter(pk=pk).first()
+        provider = self.get_queryset().filter(pk=pk).first()
         if provider is None:
             return Response({'error': 'Proveedor no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -168,13 +151,11 @@ class CustomerView(ModelViewSet):
     pagination_class = CustomPagination
 
     def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
         data = self.request.query_params.dict()
         data.pop("page", None)
         keyword = data.pop("keyword", None)
 
-        results = self.queryset.filter(**data).order_by('id')
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data).order_by('id')
 
         if keyword:
             search_fields = (
@@ -193,7 +174,11 @@ class CustomerView(ModelViewSet):
 
     def update(self, request, pk):
         request.data.update({"company_id": request.user.company_id})
-        customer = Customer.objects.filter(pk=pk).first()
+        customer = self.get_queryset().filter(pk=pk).first()
+
+        if customer is None:
+            return Response({'error': 'Cliente no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(customer, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -202,7 +187,7 @@ class CustomerView(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
-        customer = Customer.objects.filter(pk=pk).first()
+        customer = self.get_queryset().filter(pk=pk).first()
         customer.delete()
         add_user_activity(request.user, f"{request.user.fullname} creó el cliente: {customer}")
         return Response({"message": "Cliente eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
@@ -218,13 +203,11 @@ class InventoryGroupView(ModelViewSet):
     pagination_class = CustomPagination
 
     def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
         data = self.request.query_params.dict()
         data.pop("page", None)
 
         keyword = data.pop("keyword", None)
-        results = self.queryset.filter(**data).order_by('id')
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data).order_by('id')
 
         if keyword:
             search_fields = (
@@ -245,33 +228,38 @@ class InventoryGroupView(ModelViewSet):
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
-        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        inventory_group = self.get_queryset().filter(pk=pk).first()
+
+        if inventory_group is None:
+            return Response({'error': 'Categoría no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(inventory_group, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"{request.user.fullname} actualizó la categoría: {request.data.get('name')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} actualizó la categoría: {request.data.get('name')}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, pk=None):        
-        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+    def destroy(self, request, pk=None):
+        inventory_group = self.get_queryset().filter(pk=pk).first()
         inventory_group.delete()
         add_user_activity(request.user, f"{request.user.fullname} eliminó la categoría: {inventory_group}")
         return Response({"message": "Categoría eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
-        inventory_group = InventoryGroup.objects.filter(pk=pk).first()
+        inventory_group = self.get_queryset().objects.filter(pk=pk).first()
 
         if inventory_group is None:
             return Response({'error': 'Categoria no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
         if inventory_group.belongs_to is not None:
-            inventory_group_father = InventoryGroup.objects.filter(pk=inventory_group.belongs_to_id).first()
+            inventory_group_father = self.get_queryset().filter(pk=inventory_group.belongs_to_id).first()
             if inventory_group_father.active == False:
                 return Response({'error': 'Categoria padre no está activa'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not inventory_group.active == False:
-            for group in InventoryGroup.objects.filter(belongs_to_id=pk).all():
+            for group in self.get_queryset().filter(belongs_to_id=pk).all():
                 group.active = False
                 group.save()
 
@@ -287,15 +275,14 @@ class PaymentTerminalView(ModelViewSet):
     serializer_class = PaymentTerminalSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
+    filter_backends = (CompanyFilterBackend,)
 
     def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
         data = self.request.query_params.dict()
         data.pop("page", None)
 
         keyword = data.pop("keyword", None)
-        results = self.queryset.filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
 
         if keyword:
             search_fields = (
@@ -314,22 +301,27 @@ class PaymentTerminalView(ModelViewSet):
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
-        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        terminal = self.get_queryset().filter(pk=pk).first()
+
+        if terminal is None:
+            return Response({'error': 'Datafono no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(terminal, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"{request.user.fullname} actualizó el datafono: {request.data.get('name')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} actualizó el datafono: {request.data.get('name')}")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
-        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        terminal = self.get_queryset().filter(pk=pk).first()
         add_user_activity(request.user, f"{request.user.fullname} eliminó el datafono: {terminal}")
         terminal.delete()
         return Response({"message": "Datafono eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
-        terminal = PaymentTerminal.objects.filter(pk=pk).first()
+        terminal = self.get_queryset().filter(pk=pk).first()
         if terminal is None:
             return Response({'error': 'Datafono no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -340,22 +332,20 @@ class PaymentTerminalView(ModelViewSet):
 
 
 class InvoiceView(ModelViewSet):
-    http_method_names = ('get', 'post', 'put', 'delete')
+    http_method_names = ('get', 'post')
     queryset = Invoice.objects.select_related(
         "created_by", "sale_by", "payment_terminal", "dian_resolution").prefetch_related("invoice_items")
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
+    filter_backends = (CompanyFilterBackend,)
 
     def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
-
         data = self.request.query_params.dict()
         data.pop("page", None)
 
         keyword = data.pop("keyword", None)
-        results = self.queryset.filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
 
         if keyword:
             search_fields = (
@@ -386,20 +376,16 @@ class InvoiceView(ModelViewSet):
 
                 request.data.update(
                     {"dian_resolution_id": dian_resolution_document_number, "invoice_number": new_current_number})
-                
+
                 invoice = super().create(request, *args, **kwargs)
 
-                add_user_activity(request.user, f"{request.user.fullname} creó la factura: {request.data.get('invoice_number')}")
-                
-                return Response({"message": "Factura creada satisfactoriamente", "data": invoice.data}, status=status.HTTP_201_CREATED)
+                add_user_activity(request.user,
+                                  f"{request.user.fullname} creó la factura: {request.data.get('invoice_number')}")
+
+                return Response({"message": "Factura creada satisfactoriamente", "data": invoice.data},
+                                status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, pk=None):
-        invoice = Invoice.objects.filter(pk=pk).first()
-        add_user_activity(request.user, f"{request.user.fullname} eliminó la factura: {invoice.invoice_number}")
-        invoice.delete()
-        return Response({"message": "Factura eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
 class InvoiceSimpleListView(ModelViewSet):
@@ -415,9 +401,8 @@ class InvoiceSimpleListView(ModelViewSet):
         data.pop("page", None)
 
         keyword = data.pop("keyword", None)
-        results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
-                                                 ).prefetch_related("invoice_items", "payment_methods"
-                                                                    ).filter(**data).filter(
+        results = filter_company(self.queryset, self.request.user.company_id
+                                 ).filter(**data).filter(
             invoice_items__is_gift=False)
 
         if keyword:
@@ -434,25 +419,25 @@ class InvoiceSimpleListView(ModelViewSet):
 
 
 class UpdateInvoiceView(APIView):
+    """
+    View to override an invoice
+    """
     def patch(self, request, invoice_number):
         try:
-            invoice = Invoice.objects.get(invoice_number=invoice_number)
+            invoice = filter_company(Invoice.objects, self.request.user.company_id).get(invoice_number=invoice_number)
         except Invoice.DoesNotExist:
             return Response({"error": "Factura no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
         if invoice.is_override:
             return Response({"error": "La Factura ya está anulada"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Actualizar el estado is_override de la factura a True
         invoice.is_override = True
 
-        # Restaurar la cantidad de elementos en el inventario para los InvoiceItems correspondientes
         for item in invoice.invoice_items.all():
             inventory_item = item.item
             inventory_item.total_in_shops += item.quantity
             inventory_item.save()
 
-        # Guardar los cambios en la base de datos
         invoice.save()
         add_user_activity(request.user, f"{request.user.fullname} actualizó la factura: {invoice.invoice_number}")
         return Response({"message": "Factura actualizada satisfactoriamente"}, status=status.HTTP_200_OK)
@@ -467,7 +452,7 @@ class InvoicePainterView(ModelViewSet):
         if not id:
             return Response({"error": "Debe ingresar un número de factura"}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            invoice = Invoice.objects.select_related(
+            invoice = filter_company(Invoice.objects, self.request.user.company_id).select_related(
                 "payment_terminal", "created_by"
             ).filter(invoice_number=invoice_number).first()
 
@@ -509,7 +494,8 @@ class InventoryCSVLoaderView(ModelViewSet):
                     "buying_price": float(row[7]),
                     "usd_price": float(row[8]),
                     "provider_id": int(row[9]),
-                    "created_by_id": request.user.id
+                    "created_by_id": request.user.id,
+                    "company_id": request.user.company_id,
                 })
         except csv.Error as e:
             raise Exception(e)
@@ -523,7 +509,7 @@ class InventoryCSVLoaderView(ModelViewSet):
         data_validation.save()
 
         add_user_activity(request.user, f"{request.user.fullname} ingresó productos mediante archivo CSV")
-        
+
         return Response({
             "success": "Productos creados satisfactoriamente"
         })
@@ -537,16 +523,13 @@ class DianResolutionView(ModelViewSet):
     pagination_class = CustomPagination
 
     def get_queryset(self):
-        if self.request.method.lower() != 'get':
-            return self.queryset
-
-        current_resolution = self.queryset.filter(active=True).first()
+        current_resolution = filter_company(self.queryset, self.request.user.company_id).filter(active=True).first()
 
         if current_resolution is not None and current_resolution.to_date < date.today():
             current_resolution.active = False
             current_resolution.save()
 
-        query_set = DianResolution.objects.all()
+        query_set = filter_company(self.queryset, self.request.user.company_id)
         data = self.request.query_params.dict()
         data.pop("page", None)
         keyword = data.pop("keyword", None)
@@ -569,16 +552,21 @@ class DianResolutionView(ModelViewSet):
         if DianResolution.objects.all().filter(active=True).exists():
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
-        add_user_activity(request.user, f"{request.user.fullname} creó una nueva resolución '{request.data.get('document_number')}' valida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
+        add_user_activity(request.user,
+                          f"{request.user.fullname} creó una nueva resolución '{request.data.get('document_number')}' valida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
-        dian_res = DianResolution.objects.filter(pk=pk).first()
+        dian_res = self.get_queryset().filter(pk=pk).first()
+
+        if dian_res is None:
+            return Response({'error': 'Resolución DIAN no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(dian_res, data=request.data)
 
         if request.data.get("active") is not None and request.data.get("active", True) is True:
-            if DianResolution.objects.all().filter(active=True).exists():
+            if self.get_queryset().filter(active=True).exists():
                 raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                                 "por favor, desactive primero la actual")
 
@@ -586,21 +574,22 @@ class DianResolutionView(ModelViewSet):
             serializer.save()
             return Response(serializer.data)
 
-        add_user_activity(request.user, f"{request.user.fullname} actualizó la resolución '{request.data.get('document_number')}'")
+        add_user_activity(request.user,
+                          f"{request.user.fullname} actualizó la resolución '{request.data.get('document_number')}'")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
-        dian_res = DianResolution.objects.filter(pk=pk).first()
+        dian_res = self.get_queryset().filter(pk=pk).first()
         add_user_activity(request.user, f"{request.user.fullname} eliminó la resolución '{dian_res.document_number}'")
         dian_res.delete()
         return Response({"message": "Resolución DIAN eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
-        resolution = DianResolution.objects.filter(pk=pk).first()
+        resolution = self.get_queryset().filter(pk=pk).first()
         if resolution is None:
             return Response({'error': 'Resolución DIAN no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
-        if DianResolution.objects.all().filter(active=True).exists() and resolution.active is False:
+        if self.get_queryset().filter(active=True).exists() and resolution.active is False:
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
 
@@ -612,9 +601,11 @@ class DianResolutionView(ModelViewSet):
         serializer = self.serializer_class(resolution)
 
         if resolution.active == True:
-            add_user_activity(request.user, f"{request.user.fullname} activó la resolución '{resolution.document_number}'")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} activó la resolución '{resolution.document_number}'")
         else:
-            add_user_activity(request.user, f"{request.user.fullname} desactivó la resolución '{resolution.document_number}'")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} desactivó la resolución '{resolution.document_number}'")
 
         return Response(serializer.data)
 
@@ -624,16 +615,13 @@ class GoalView(ModelViewSet):
     queryset = Goals.objects.all()
     serializer_class = GoalSerializer
     permission_classes = (IsAuthenticatedCustom,)
+    filter_backends = (CompanyFilterBackend,)
 
     def get_queryset(self):
-        if self.request.method.lower() != 'get':
-            return self.queryset
-
-        query_set = Goals.objects.all()
         data = self.request.query_params.dict()
         keyword = data.pop("keyword", None)
 
-        results = query_set.filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
 
         if keyword:
             search_fields = (
@@ -649,45 +637,61 @@ class GoalView(ModelViewSet):
         request.data.update({"company_id": request.user.company_id})
 
         if request.data.get('goal_type') == 'diary':
-            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta diaria de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} creó una nueva meta diaria de {request.data.get('goal_value')}")
         elif request.data.get('goal_type') == 'weekly':
-            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta semanal de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} creó una nueva meta semanal de {request.data.get('goal_value')}")
         elif request.data.get('goal_type') == 'monthly':
-            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta mensual de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} creó una nueva meta mensual de {request.data.get('goal_value')}")
         elif request.data.get('goal_type') == 'annual':
-            add_user_activity(request.user, f"{request.user.fullname} creó una nueva meta anual de {request.data.get('goal_value')}")
-        
+            add_user_activity(request.user,
+                              f"{request.user.fullname} creó una nueva meta anual de {request.data.get('goal_value')}")
+
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
-        goal = Goals.objects.filter(pk=pk).first()
+        goal = self.get_queryset().filter(pk=pk).first()
+
+        if goal is None:
+            return Response({'error': 'Meta no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = self.serializer_class(goal, data=request.data)
         if serializer.is_valid():
             if request.data.get('goal_value') != goal.goal_value:
                 if request.data.get('goal_type') == 'diary':
-                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta diaria de {goal.goal_value} a {request.data.get('goal_value')}")
+                    add_user_activity(request.user,
+                                      f"{request.user.fullname} actualizó la meta diaria de {goal.goal_value} a {request.data.get('goal_value')}")
                 elif request.data.get('goal_type') == 'weekly':
-                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta semanal de {goal.goal_value} a {request.data.get('goal_value')}")
+                    add_user_activity(request.user,
+                                      f"{request.user.fullname} actualizó la meta semanal de {goal.goal_value} a {request.data.get('goal_value')}")
                 elif request.data.get('goal_type') == 'monthly':
-                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta mensual de {goal.goal_value} a {request.data.get('goal_value')}")
+                    add_user_activity(request.user,
+                                      f"{request.user.fullname} actualizó la meta mensual de {goal.goal_value} a {request.data.get('goal_value')}")
                 elif request.data.get('goal_type') == 'annual':
-                    add_user_activity(request.user, f"{request.user.fullname} actualizó la meta anual de {goal.goal_value} a {request.data.get('goal_value')}")
+                    add_user_activity(request.user,
+                                      f"{request.user.fullname} actualizó la meta anual de {goal.goal_value} a {request.data.get('goal_value')}")
             serializer.save()
             return Response(serializer.data)
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
-        goal = Goals.objects.filter(pk=pk).first()
+        goal = self.get_queryset().filter(pk=pk).first()
         if goal.goal_type == 'diary':
-            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta diaria de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} eliminó la meta diaria de {request.data.get('goal_value')}")
         elif goal.goal_type == 'weekly':
-            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta semanal de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} eliminó la meta semanal de {request.data.get('goal_value')}")
         elif goal.goal_type == 'monthly':
-            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta mensual de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} eliminó la meta mensual de {request.data.get('goal_value')}")
         elif goal.goal_type == 'annual':
-            add_user_activity(request.user, f"{request.user.fullname} eliminó la meta anual de {request.data.get('goal_value')}")
+            add_user_activity(request.user,
+                              f"{request.user.fullname} eliminó la meta anual de {request.data.get('goal_value')}")
         goal.delete()
         return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -702,7 +706,7 @@ class InvoicePaymentMethodsView(APIView):
                 request.data.update({"company_id": request.user.company_id})
                 invoice_id = request.GET.get('invoice_id', None)
 
-                invoice = Invoice.objects.filter(id=invoice_id).first()
+                invoice = filter_company(Invoice.objects, self.request.user.company_id).filter(id=invoice_id).first()
                 if invoice is None:
                     raise Exception("Factura no encontrada")
 
@@ -710,7 +714,7 @@ class InvoicePaymentMethodsView(APIView):
 
                 for query in invoice.payment_methods.all():
                     old_payment_methods.append(query.name)
-                
+
                 invoice.payment_methods.all().delete()
 
                 payment_methods = request.data.get("payment_methods", None)
@@ -735,8 +739,9 @@ class InvoicePaymentMethodsView(APIView):
                         company_id=request.user.company_id
                     )
                     new_payment_methods.append(method.get("name"))
-                
-                add_user_activity(request.user, f"{request.user.fullname} actualizó los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
+
+                add_user_activity(request.user,
+                                  f"{request.user.fullname} actualizó los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
 
                 if 'payment_terminal_id' in request.data:
                     invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
@@ -755,7 +760,7 @@ class InvoicePaymentMethodsView(APIView):
 
 class UploadFileView(ModelViewSet):
     http_method_names = ["post"]
-    permission_classes = (IsAuthenticatedCustom, )
+    permission_classes = (IsAuthenticatedCustom,)
 
     def upload_photo(self, request):
         file = request.FILES.get("file")

@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import create_terminals_report, create_dollars_report, \
     create_cash_report, create_inventory_report, create_product_sales_report, create_invoices_report, \
-    electronic_invoice_report, clients_report, electronic_invoice_report_by_invoice
+    electronic_invoice_report, clients_report, electronic_invoice_report_by_invoice, filter_company
 from django.db.models import Count, Sum, F, Q, Value, CharField, ExpressionWrapper, \
     DecimalField, IntegerField, When, Case, Window
 from django.db.models.functions import Coalesce
@@ -52,9 +52,10 @@ class ReportExporter(APIView):
         ws.title = "REPORTE DIARIO"
         ws.column_dimensions[get_column_letter(2)].width = 29
 
+        invoices_queryset = filter_company(Invoice.objects.all(), self.request.user.company_id)
+
         terminals_report_data = (
-            Invoice.objects.select_related("PaymentMethods", "payment_terminal", "created_by")
-            .all()
+            invoices_queryset.select_related("PaymentMethods", "payment_terminal", "created_by")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
@@ -68,8 +69,7 @@ class ReportExporter(APIView):
         last_row_cards = create_terminals_report(ws, terminals_report_data, start_date, end_date)
 
         dollar_report_data = (
-            Invoice.objects.select_related("InvoiceItems", "created_by")
-            .all()
+            invoices_queryset.select_related("InvoiceItems", "created_by")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(is_dollar=True)
@@ -83,8 +83,7 @@ class ReportExporter(APIView):
         last_row_dollars = create_dollars_report(ws, dollar_report_data, last_row_cards, start_date, end_date)
 
         cash_report_data = (
-            Invoice.objects.select_related("InvoiceItems", "created_by")
-            .all()
+            invoices_queryset.select_related("InvoiceItems", "created_by")
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
@@ -95,8 +94,7 @@ class ReportExporter(APIView):
         )
 
         dollar_report_data_in_pesos = (
-            Invoice.objects.select_related("InvoiceItems", "created_by")
-            .all()
+            invoices_queryset.select_related("InvoiceItems", "created_by")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
@@ -108,8 +106,7 @@ class ReportExporter(APIView):
         )
 
         cards_report_data = (
-            Invoice.objects.select_related("PaymentMethods", "created_by")
-            .all()
+            invoices_queryset.select_related("PaymentMethods", "created_by")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(payment_methods__name__in=["debitCard", "creditCard"])
@@ -120,8 +117,7 @@ class ReportExporter(APIView):
         )
 
         transfers_report_data = (
-            Invoice.objects.select_related("PaymentMethods", "created_by")
-            .all()
+            invoices_queryset.select_related("PaymentMethods", "created_by")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(payment_methods__name__in=["nequi", "bankTransfer"])
@@ -156,9 +152,8 @@ class InventoriesReportExporter(APIView):
         ws.title = "REPORTE DE INVENTARIOS"
 
         inventories_report_data = (
-            Inventory.objects.select_related("group")
+            filter_company(Inventory.objects.all(), self.request.user.company_id).select_related("group")
             .filter(active=True)
-            .all()
             .annotate(
                 upper_group_name=Upper("group__belongs_to__name"),
                 upper_group_subname=Upper("group__name"),
@@ -203,9 +198,9 @@ class ItemsReportExporter(APIView):
         if not start_date or not end_date:
             return Response({"error": "Debe ingresar un rango de fechas"})
 
+        invoices_queryset = filter_company(Invoice.objects.all(), self.request.user.company_id)
         report_data = (
-            Invoice.objects.select_related("InvoiceItems")
-            .all()
+            invoices_queryset.select_related("InvoiceItems")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
@@ -216,8 +211,7 @@ class ItemsReportExporter(APIView):
         )
 
         report_data_nulled = (
-            Invoice.objects.select_related("InvoiceItems")
-            .all()
+            invoices_queryset.select_related("InvoiceItems")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=True)
             .filter(invoice_items__is_gift=False)
@@ -228,8 +222,7 @@ class ItemsReportExporter(APIView):
         )
 
         report_data_gifts = (
-            Invoice.objects.select_related("InvoiceItems")
-            .all()
+            filter_company(Invoice.objects.all(), self.request.user.company_id).select_related("InvoiceItems")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(invoice_items__is_gift=True)
@@ -265,8 +258,8 @@ class InvoicesReportExporter(APIView):
         ws.title = "REPORTE DE FACTURACION"
 
         inventories_report_data = (
-            Invoice.objects.select_related("payment_terminal", "InvoiceItems", "created_by")
-            .all()
+            filter_company(Invoice.objects.all(),
+                           self.request.user.company_id).select_related("payment_terminal", "InvoiceItems", "created_by")
             .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
@@ -321,9 +314,8 @@ class ElectronicInvoiceExporter(APIView):
         ws.title = "Movimientos"
 
         electronic_invoice_report_data = (
-            Invoice.objects.select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems",
+            filter_company(Invoice.objects.all(), self.request.user.company_id).select_related("invoice_number", "PaymentMethods", "payment_terminal", "InvoiceItems",
                                            "created_by")
-            .all()
             .filter(created_at__range=(start, end))
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
@@ -375,7 +367,8 @@ class ElectronicInvoiceExporter(APIView):
         ws2 = wb.create_sheet(title="FormatoTerceros")
 
         clients_report_data = (
-            Customer.objects.annotate(total_invoices=Count('customer'))
+            filter_company(Customer.objects, self.request.user.company_id)
+            .annotate(total_invoices=Count('customer'))
             .filter(total_invoices__gt=0)
             .filter(~Q(customer__created_at__lt=start))
             .distinct()
@@ -417,9 +410,9 @@ class ElectronicInvoiceExporter(APIView):
         ws3 = wb.create_sheet(title="Detalle Facturas")
 
         payment_methods_report = (
-            Invoice.objects.select_related("invoice_number", "PaymentMethods", "InvoiceItems",
+            filter_company(Invoice.objects.all(), self.request.user.company_id
+                           ).select_related("invoice_number", "PaymentMethods", "InvoiceItems",
                                            "created_by")
-            .all()
             .filter(created_at__range=(start, end))
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
@@ -442,8 +435,8 @@ class ElectronicInvoiceExporter(APIView):
         payment_methods_report = [item for item in payment_methods_report if item[2] == 1]
 
         amount_report = (
-            Invoice.objects.select_related("invoice_number", "InvoiceItems")
-            .all()
+            filter_company(Invoice.objects.all(), self.request.user.company_id
+                           ).select_related("invoice_number", "InvoiceItems")
             .filter(created_at__range=(start, end))
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)

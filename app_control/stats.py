@@ -5,6 +5,7 @@ from django.db.models.functions.text import Concat
 
 from rest_framework.viewsets import ModelViewSet
 
+from inventory_api.utils import filter_company
 from .serializers import (
     Inventory, Invoice, InvoiceItem
 )
@@ -23,7 +24,7 @@ class SummaryView(ModelViewSet):
     queryset = InventoryView.queryset
 
     def list(self, request, *args, **kwargs):
-        total_inventory = InventoryView.queryset.filter(active=True).count()
+        total_inventory = filter_company(self.queryset, self.request.user.company_id).filter(active=True).count()
         total_group = InventoryGroupView.queryset.filter(active=True).count()
         total_users = CustomUser.objects.filter(is_superuser=False).filter(is_active=True).count()
 
@@ -39,7 +40,7 @@ class SalePerformance(ModelViewSet):
     permission_classes = (IsAuthenticatedCustom,)
 
     def top_selling(self, request, *args, **kwargs):
-        query = Inventory.objects.all()
+        query = filter_company(Inventory.objects.all(), self.request.user.company_id)
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
 
@@ -73,7 +74,7 @@ class HourlySalesQuantities(ModelViewSet):
         hours = [{'time': hour, 'total_quantity': 0} for hour in range(24)]
 
         data = (
-            Invoice.objects.all()
+            filter_company(Invoice.objects.all(), self.request.user.company_id)
             .filter(is_override=False)
             .filter(invoice_items__is_gift=False)
             .filter(created_at__gte=datetime.now().date())
@@ -113,7 +114,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             days.reverse()
 
             data = (
-                Invoice.objects.all()
+                filter_company(Invoice.objects.all(), self.request.user.company_id)
                 .filter(is_override=False)
                 .filter(invoice_items__is_gift=False)
                 .filter(created_at__gte=datetime.now().date() - timedelta(days=7))
@@ -149,7 +150,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             weeks.reverse()
 
             data = (
-                Invoice.objects.all()
+                filter_company(Invoice.objects.all(), self.request.user.company_id)
                 .filter(is_override=False)
                 .filter(invoice_items__is_gift=False)
                 .filter(created_at__gte=datetime.now().date() - timedelta(weeks=5))
@@ -183,7 +184,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
                 months.append({'month': month_name, 'total_amount': 0})
 
             data = (
-                Invoice.objects.all()
+                filter_company(Invoice.objects.all(), self.request.user.company_id)
                 .filter(is_override=False)
                 .filter(invoice_items__is_gift=False)
                 .filter(created_at__year=current_year)
@@ -211,25 +212,27 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             current_month_start = today.replace(day=1)
             current_year_start = today.replace(month=1, day=1)
 
-            total_day = Invoice.objects.filter(
+            invoices_queryset = filter_company(Invoice.objects.all(), self.request.user.company_id)
+
+            total_day = invoices_queryset.filter(
                 is_override=False,
                 invoice_items__is_gift=False,
                 created_at__date=today
             ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
 
-            total_week = Invoice.objects.filter(
+            total_week = invoices_queryset.filter(
                 is_override=False,
                 invoice_items__is_gift=False,
                 created_at__gte=current_week_start
             ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
 
-            total_month = Invoice.objects.filter(
+            total_month = invoices_queryset.filter(
                 is_override=False,
                 invoice_items__is_gift=False,
                 created_at__gte=current_month_start
             ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
 
-            total_year = Invoice.objects.filter(
+            total_year = invoices_queryset.filter(
                 is_override=False,
                 invoice_items__is_gift=False,
                 created_at__gte=current_year_start
@@ -257,7 +260,8 @@ class SalesByUsersView(ModelViewSet):
 
         if not start_date or not end_date:
             sales_by_user = (
-                Invoice.objects.select_related("InvoiceItems", "sale_by")
+                filter_company(Invoice.objects.all(), self.request.user.company_id)
+                .select_related("InvoiceItems", "sale_by")
                 .all()
                 .filter(is_override=False)
                 .filter(invoice_items__is_gift=False)
@@ -272,7 +276,8 @@ class SalesByUsersView(ModelViewSet):
             )
         else:
             sales_by_user = (
-                Invoice.objects.select_related("InvoiceItems", "sale_by")
+                filter_company(Invoice.objects.all(), self.request.user.company_id)
+                .select_related("InvoiceItems", "sale_by")
                 .all()
                 .filter(is_override=False)
                 .filter(invoice_items__is_gift=False)
@@ -296,7 +301,7 @@ class PurchaseView(ModelViewSet):
     queryset = InvoiceView.queryset
 
     def purchase_data(self, request, *args, **kwargs):
-        query = InvoiceItem.objects.select_related("invoice", "item")
+        query = filter_company(InvoiceItem.objects, self.request.user.company_id).select_related("invoice", "item")
         start_date = request.data.get("start_date", None)
         end_date = request.data.get("end_date", None)
 

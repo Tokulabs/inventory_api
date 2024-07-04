@@ -97,6 +97,10 @@ def get_query(query_string, search_fields):
         return query
 
 
+def filter_company(queryset, company_id):
+    return queryset.filter(company_id=company_id)
+
+
 def create_terminals_report(ws, report_data, start_date, end_date):
     if not report_data:
         return 3
