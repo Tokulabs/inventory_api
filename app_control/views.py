@@ -275,7 +275,6 @@ class PaymentTerminalView(ModelViewSet):
     serializer_class = PaymentTerminalSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
-    filter_backends = (CompanyFilterBackend,)
 
     def get_queryset(self):
         data = self.request.query_params.dict()
@@ -338,7 +337,6 @@ class InvoiceView(ModelViewSet):
     serializer_class = InvoiceSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
-    filter_backends = (CompanyFilterBackend,)
 
     def get_queryset(self):
         data = self.request.query_params.dict()
@@ -615,7 +613,6 @@ class GoalView(ModelViewSet):
     queryset = Goals.objects.all()
     serializer_class = GoalSerializer
     permission_classes = (IsAuthenticatedCustom,)
-    filter_backends = (CompanyFilterBackend,)
 
     def get_queryset(self):
         data = self.request.query_params.dict()
