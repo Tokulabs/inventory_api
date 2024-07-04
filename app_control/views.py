@@ -420,6 +420,8 @@ class UpdateInvoiceView(APIView):
     """
     View to override an invoice
     """
+    permission_classes = (IsAuthenticatedCustom,)
+
     def patch(self, request, invoice_number):
         try:
             invoice = filter_company(Invoice.objects, self.request.user.company_id).get(invoice_number=invoice_number)
