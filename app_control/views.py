@@ -248,7 +248,7 @@ class InventoryGroupView(ModelViewSet):
         return Response({"message": "Categoría eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
-        inventory_group = self.get_queryset().objects.filter(pk=pk).first()
+        inventory_group = self.get_queryset().filter(pk=pk).first()
 
         if inventory_group is None:
             return Response({'error': 'Categoria no encontrada'}, status=status.HTTP_404_NOT_FOUND)
@@ -358,7 +358,7 @@ class InvoiceView(ModelViewSet):
         try:
             with transaction.atomic():
                 request.data.update({"company_id": request.user.company_id})
-                dian_resolution = DianResolution.objects.filter(active=True).first()
+                dian_resolution = filter_company(DianResolution.objects, self.request.user.company_id).filter(active=True).first()
                 if not dian_resolution:
                     raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
 
