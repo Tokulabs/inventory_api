@@ -547,7 +547,7 @@ class DianResolutionView(ModelViewSet):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
 
-        if DianResolution.objects.all().filter(active=True).exists():
+        if filter_company(DianResolution.objects.all(), self.request.user.company_id).filter(active=True).exists():
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
         add_user_activity(request.user,
