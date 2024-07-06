@@ -97,6 +97,10 @@ def get_query(query_string, search_fields):
         return query
 
 
+def filter_company(queryset, company_id):
+    return queryset.filter(company_id=company_id)
+
+
 def create_terminals_report(ws, report_data, start_date, end_date):
     if not report_data:
         return 3
@@ -399,12 +403,13 @@ def create_inventory_report(ws, report_data):
             ws[f"{get_column_letter(column)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
 
-def create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date):
+def create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts,
+                                start_date, end_date, company):
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
-    ws['A1'] = "SIGNOS STUDIO SAS"
+    ws['A1'] = f"{company.name}"
 
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=3)
-    ws['A2'] = "NIT. 832004603-8"
+    ws['A2'] = f"NIT. {company.nit}"
 
     ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=3)
     ws['A3'] = f"Del {start_date} al {end_date}"
