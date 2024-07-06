@@ -33,9 +33,6 @@ AUTH_USER_MODEL = 'user_control.CustomUser'
 
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'inventory_api.custom_methods.custom_exception_handler',
-    'DEFAULT_FILTER_BACKENDS': [
-        'inventory_api.middlewares.CompanyFilterBackend'
-    ],
 }
 
 # Application definition
@@ -48,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'rest_framework',
     'user_control',
     'app_control'
 ]
