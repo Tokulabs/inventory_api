@@ -2,7 +2,6 @@ from datetime import date
 
 import boto3
 from django.db import transaction
-from inventory_api.middlewares import CompanyFilterBackend
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
