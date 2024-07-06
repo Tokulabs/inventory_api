@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
 from datetime import datetime
-from inventory_api.utils import get_access_token, CustomPagination, get_query
+from inventory_api.utils import get_access_token, CustomPagination, get_query, filter_company
 from inventory_api.custom_methods import IsAuthenticatedCustom
 
 
@@ -135,13 +135,11 @@ class UserActivitiesView(ModelViewSet):
     pagination_class = CustomPagination
 
     def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return self.queryset
         data = self.request.query_params.dict()
         data.pop("page", None)
         keyword = data.pop("keyword", None)
 
-        results = self.queryset.filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
 
         if keyword:
             search_fields = (
@@ -161,12 +159,10 @@ class UsersView(ModelViewSet):
     pagination_class = CustomPagination
 
     def get_queryset(self):
-        if self.request.method.lower() != "get":
-            return CustomUser.objects.all()
         data = self.request.query_params.dict()
         keyword = data.pop("keyword", None)
         data.pop("page", None)
-        results = self.queryset.filter(is_superuser=False, **data)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(is_superuser=False, **data)
 
         if keyword:
             search_fields = ("fullname", "email", "role")
@@ -176,7 +172,7 @@ class UsersView(ModelViewSet):
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
-        user = CustomUser.objects.filter(pk=pk).first()
+        user = self.get_queryset().filter(pk=pk).first()
         serializer = self.serializer_class(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -185,7 +181,7 @@ class UsersView(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def toggle_is_active(self, request, pk=None):
-        user = CustomUser.objects.filter(pk=pk).first()
+        user = self.get_queryset().filter(pk=pk).first()
         if user is None:
             return Response({'error': 'Usuario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 

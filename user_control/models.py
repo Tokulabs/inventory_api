@@ -13,6 +13,9 @@ class Company(models.Model):
     name = models.CharField(max_length=255, unique=True)
     dian_token = models.CharField(max_length=255, unique=True)
     nit = models.CharField(max_length=255, unique=True)
+    short_name = models.CharField(max_length=255, unique=True, null=True)
+    phone = models.CharField(max_length=255, null=True)
+    logo = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
