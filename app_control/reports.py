@@ -232,7 +232,8 @@ class ItemsReportExporter(APIView):
             )
         )
 
-        create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date)
+        create_product_sales_report(ws, report_data, report_data_nulled, report_data_gifts, start_date, end_date,
+                                    self.request.user.company)
 
         wb.save(response)
 
