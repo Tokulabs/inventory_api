@@ -12,7 +12,7 @@ class InventoryGroupSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     belongs_to = serializers.SerializerMethodField(read_only=True)
-    belongs_to_id = serializers.CharField(write_only=True, required=False)
+    belongs_to_id = serializers.CharField(write_only=True, required=False, allow_null=True)
     total_items = serializers.CharField(read_only=True, required=False)
     company_id = serializers.IntegerField(required=False)
 

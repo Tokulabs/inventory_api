@@ -195,7 +195,7 @@ class UsersView(ModelViewSet):
 class CompanyView(ModelViewSet):
     serializer_class = CompanySerializer
     queryset = Company.objects.all()
-    http_method_names = ("get", "post", "put", "delete")
+    http_method_names = ("get", "post", "put")
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
 
@@ -212,3 +212,21 @@ class CompanyView(ModelViewSet):
             query = get_query(keyword, search_fields)
             results = results.filter(query)
         return results
+
+    def update(self, request, pk=None):
+        if not request.user.is_superuser:
+            return Response(
+                {"error": "No tienes permisos para realizar esta acción"},
+                status=status.HTTP_403_FORBIDDEN)
+
+        company = self.queryset.filter(pk=pk).first()
+
+        if company is None:
+            return Response({'error': 'Compañía no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.serializer_class(company, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            add_user_activity(request.user, f"Empresa '{company.name}' Actualizada")
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
