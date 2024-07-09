@@ -222,12 +222,18 @@ class InventoryGroupView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
+
         add_user_activity(request.user, f"{request.user.fullname} creó una nueva categoría: {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
         inventory_group = self.get_queryset().filter(pk=pk).first()
+
+        if int(request.data.get("belongs_to_id")) == int(pk):
+            print("No puede seleccionar una categoría como su propio padre")
+            return Response({'error': 'No puede seleccionar una categoría como su propio padre'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if inventory_group is None:
             return Response({'error': 'Categoría no encontrada'}, status=status.HTTP_404_NOT_FOUND)
