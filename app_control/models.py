@@ -228,9 +228,7 @@ class PaymentTerminal(models.Model):
 
     def delete(self, *args, **kwargs):
         created_by = self.created_by
-        action = f"deleted payment terminal with name - '{self.name}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
 
 class DianResolution(models.Model):
@@ -360,13 +358,13 @@ class InvoiceItem(models.Model):
 
 
 class Goals(models.Model):
-    DIARY = 'diary'
+    DAILY = 'daily'
     WEEKLY = 'weekly'
     MONTHLY = 'monthly'
     ANNUAL = 'annual'
 
     GOAL_TYPE_CHOICES = [
-        (DIARY, 'Diary'),
+        (DAILY, 'Daily'),
         (WEEKLY, 'Weekly'),
         (MONTHLY, 'Monthly'),
         (ANNUAL, 'Annual'),

@@ -238,7 +238,7 @@ class SalesBySelectedTimeframeSummary(ModelViewSet):
             ).aggregate(total_amount=Sum('invoice_items__amount'))['total_amount'] or 0
 
             general_values = {
-                'diary': total_day,
+                'daily': total_day,
                 'weekly': total_week,
                 'monthly': total_month,
                 'annual': total_year,
