@@ -37,7 +37,7 @@ class CreateUserView(ModelViewSet):
 
         print(request.user.fullname)
 
-        add_user_activity(request.user, "Se creó un nuevo usuario")
+        add_user_activity(request.user, f"Se creó un nuevo usuario: {request.data.get('email')}")
         
         return Response(
             {"success": "Usuario creado satisfactoriamente"},
@@ -188,12 +188,12 @@ class UsersView(ModelViewSet):
         user.is_active = not user.is_active
         user.save()
 
-        if user.is_active is False:
-            add_user_activity(request.user, "Usuario desactivado")
-        else:
-            add_user_activity(request.user, "Usuario activado")
-
         serializer = self.serializer_class(user)
+
+        if user.is_active is False:
+            add_user_activity(request.user, f"Usuario {(serializer.data.get('email'))} desactivado")
+        else:
+            add_user_activity(request.user, f"Usuario {(serializer.data.get('email'))} activado")
         return Response(serializer.data)
 
 

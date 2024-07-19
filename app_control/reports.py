@@ -175,7 +175,7 @@ class InventoriesReportExporter(APIView):
 
         wb.save(response)
 
-        add_user_activity(request.user, f"Se descargó el reporte de inventarios")
+        add_user_activity(request.user, f"Se descargó el reporte de inventarios (Desde {request.data.get('start_date')} hasta {request.data.get('end_date')})")
         return response
 
 
