@@ -37,7 +37,7 @@ class CreateUserView(ModelViewSet):
 
         print(request.user.fullname)
 
-        add_user_activity(request.user, f"Se creó un nuevo usuario: {request.data.get('email')}")
+        add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
         
         return Response(
             {"success": "Usuario creado satisfactoriamente"},

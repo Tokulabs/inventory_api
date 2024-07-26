@@ -327,13 +327,13 @@ class InvoiceItem(models.Model):
 
 
 class Goals(models.Model):
-    DAILY = 'daily'
+    DAILY = 'diary'
     WEEKLY = 'weekly'
     MONTHLY = 'monthly'
     ANNUAL = 'annual'
 
     GOAL_TYPE_CHOICES = [
-        (DAILY, 'Daily'),
+        (DAILY, 'Diary'),
         (WEEKLY, 'Weekly'),
         (MONTHLY, 'Monthly'),
         (ANNUAL, 'Annual'),

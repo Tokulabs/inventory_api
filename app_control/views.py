@@ -47,7 +47,7 @@ class InventoryView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"Se creó el producto con id: {request.data.get('code')}")
+        add_user_activity(request.user, f"Creó el producto con id: {request.data.get('code')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -60,14 +60,14 @@ class InventoryView(ModelViewSet):
         serializer = self.serializer_class(inventory, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"Se actualizó el producto: {inventory.code}. ({request.data})")
+            add_user_activity(request.user, f"Actualizó el producto {inventory.code}. ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         inventory = self.get_queryset().filter(pk=pk).first()
         inventory.delete()
-        add_user_activity(request.user, f"Producto con id: {inventory.code} eliminado satisfactoriamente")
+        add_user_activity(request.user, f"Eliminó el producto con id {inventory.code}")
         return Response({"message": "Producto eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -79,9 +79,9 @@ class InventoryView(ModelViewSet):
         inventory.save()
 
         if inventory.active is False:
-            add_user_activity(request.user, f"Producto {inventory.code} desactivado")
+            add_user_activity(request.user, f"Desactivó el producto {inventory.code}")
         else:
-            add_user_activity(request.user, f"Producto {inventory.code} activado")
+            add_user_activity(request.user, f"Activó el producto {inventory.code}")
 
         serializer = self.serializer_class(inventory)
         return Response(serializer.data)
@@ -112,7 +112,7 @@ class ProviderView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"Nuevo proveedor creado: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó el proveedor {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk):
@@ -126,14 +126,14 @@ class ProviderView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             add_user_activity(request.user,
-                              f"El proveedor {request.data.get('name')} fue actualizado ({request.data})")
+                              f"Actualizó el proveedor {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
         provider = self.get_queryset().filter(pk=pk).first()
         provider.delete()
-        add_user_activity(request.user, f"Se eliminó el proveedor {provider}")
+        add_user_activity(request.user, f"Eliminó el proveedor {provider}")
         return Response({"message": "Proveedor eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -145,9 +145,9 @@ class ProviderView(ModelViewSet):
         provider.save()
 
         if provider.active is False:
-            add_user_activity(request.user, f"Proveedor {provider} desactivado")
+            add_user_activity(request.user, f"Desactivó el proveedor {provider}")
         else:
-            add_user_activity(request.user, f"Proveedor {provider} activado")
+            add_user_activity(request.user, f"Activó el proveedor {provider}")
 
 
         serializer = self.serializer_class(provider)
@@ -181,7 +181,7 @@ class CustomerView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"Nuevo cliente creado: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó el cliente {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk):
@@ -194,14 +194,14 @@ class CustomerView(ModelViewSet):
         serializer = self.serializer_class(customer, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"El cliente {request.data.get('name')} fue actualizado ({request.data})")
+            add_user_activity(request.user, f"Actualizó el cliente {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
         customer = self.get_queryset().filter(pk=pk).first()
         customer.delete()
-        add_user_activity(request.user, f"Se eliminó el cliente: {customer}")
+        add_user_activity(request.user, f"Eliminó el cliente {customer}")
         return Response({"message": "Cliente eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
@@ -235,7 +235,7 @@ class InventoryGroupView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"Se creó una nueva categoría: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó la categoría {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -254,14 +254,14 @@ class InventoryGroupView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             add_user_activity(request.user,
-                              f"Se actualizó la categoría {request.data.get('name')} ({request.data})")
+                              f"Actualizó la categoría {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         inventory_group = self.get_queryset().filter(pk=pk).first()
         inventory_group.delete()
-        add_user_activity(request.user, f"Se eliminó la categoría: {inventory_group}")
+        add_user_activity(request.user, f"Eliminó la categoría {inventory_group}")
         return Response({"message": "Categoría eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -284,9 +284,9 @@ class InventoryGroupView(ModelViewSet):
         inventory_group.save()
 
         if inventory_group.active is False:
-            add_user_activity(request.user, f"Categoría {inventory_group} desactivada")
+            add_user_activity(request.user, f"Desactivó la categoría {inventory_group}")
         else:
-            add_user_activity(request.user, f"Categoría {inventory_group} activada")
+            add_user_activity(request.user, f"Activó la categoría {inventory_group}")
 
         serializer = self.serializer_class(inventory_group)
         return Response(serializer.data)
@@ -318,7 +318,7 @@ class PaymentTerminalView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"Se creó el datafono {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó el datafono {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -332,13 +332,13 @@ class PaymentTerminalView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             add_user_activity(request.user,
-                              f"Se actualizó el datafono {request.data.get('name')} ({request.data})")
+                              f"Actualizó el datafono {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         terminal = self.get_queryset().filter(pk=pk).first()
-        add_user_activity(request.user, f"Se eliminó el datafono {terminal.name}")
+        add_user_activity(request.user, f"Eliminó el datafono {terminal.name}")
         terminal.delete()
         return Response({"message": "Datafono eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -351,9 +351,9 @@ class PaymentTerminalView(ModelViewSet):
         terminal.save()
 
         if terminal.active is False:
-            add_user_activity(request.user, f"Datafono {terminal.name} desactivado")
+            add_user_activity(request.user, f"Desactivó el datafono {terminal.name}")
         else:
-            add_user_activity(request.user, f"Datafono {terminal.name} activado")
+            add_user_activity(request.user, f"Activó el datafono {terminal.name}")
 
         serializer = self.serializer_class(terminal)
         return Response(serializer.data)
@@ -407,7 +407,7 @@ class InvoiceView(ModelViewSet):
                 invoice = super().create(request, *args, **kwargs)
 
                 add_user_activity(request.user,
-                                  f"Se creó una nueva factura: {request.data.get('invoice_number')}")
+                                  f"Creó la factura {request.data.get('invoice_number')}")
 
                 return Response({"message": "Factura creada satisfactoriamente", "data": invoice.data},
                                 status=status.HTTP_201_CREATED)
@@ -468,7 +468,7 @@ class UpdateInvoiceView(APIView):
             inventory_item.save()
 
         invoice.save()
-        add_user_activity(request.user, f"Se actualizó la factura {invoice.invoice_number}")
+        add_user_activity(request.user, f"Actualizó la factura {invoice.invoice_number}")
         return Response({"message": "Factura actualizada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
@@ -537,7 +537,7 @@ class InventoryCSVLoaderView(ModelViewSet):
         data_validation.is_valid(raise_exception=True)
         data_validation.save()
 
-        add_user_activity(request.user, f"Nuevo ingreso de productos mediante archivo CSV")
+        add_user_activity(request.user, f"Ingresó productos mediante archivo CSV")
 
         return Response({
             "success": "Productos creados satisfactoriamente"
@@ -582,7 +582,7 @@ class DianResolutionView(ModelViewSet):
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
         add_user_activity(request.user,
-                          f"Se creó una nueva resolución '{request.data.get('document_number')}' valida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
+                          f"Creó la resolución '{request.data.get('document_number')}' válida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -604,12 +604,12 @@ class DianResolutionView(ModelViewSet):
             return Response(serializer.data)
 
         add_user_activity(request.user,
-                          f"Se actualizó la resolución '{request.data.get('document_number')}' ({request.data})")
+                          f"Actualizó la resolución '{request.data.get('document_number')}' ({request.data})")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         dian_res = self.get_queryset().filter(pk=pk).first()
-        add_user_activity(request.user, f"Se eliminó la resolución '{dian_res.document_number}'")
+        add_user_activity(request.user, f"Eliminó la resolución '{dian_res.document_number}'")
         dian_res.delete()
         return Response({"message": "Resolución DIAN eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -631,10 +631,10 @@ class DianResolutionView(ModelViewSet):
 
         if resolution.active == True:
             add_user_activity(request.user,
-                              f"Se activó la resolución '{resolution.document_number}'")
+                              f"Activó la resolución '{resolution.document_number}'")
         else:
             add_user_activity(request.user,
-                              f"Se desactivó la resolución '{resolution.document_number}'")
+                              f"Desactivó la resolución '{resolution.document_number}'")
 
         return Response(serializer.data)
 
@@ -664,10 +664,10 @@ class GoalView(ModelViewSet):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
 
-        goals = {"daily": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
+        goals = {"diary": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
 
         add_user_activity(request.user,
-                              f"Se creó una nueva meta {goals.get(request.data.get('goal_type'))} de {request.data.get('goal_value')}")
+                              f"Creó la meta {goals.get(request.data.get('goal_type'))} de {request.data.get('goal_value')}")
 
         return super().create(request, *args, **kwargs)
 
@@ -680,10 +680,10 @@ class GoalView(ModelViewSet):
 
         serializer = self.serializer_class(goal, data=request.data)
         if serializer.is_valid():
-            goals = {"daily": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
+            goals = {"diary": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
 
             add_user_activity(request.user,
-                              f"Se actualizó la meta {goals.get(request.data.get('goal_type'))} de {goal.goal_value} a {request.data.get('goal_value')}")
+                              f"Actualizó la meta {goals.get(request.data.get('goal_type'))} de {goal.goal_value} a {request.data.get('goal_value')}")
             serializer.save()
             return Response(serializer.data)
 
@@ -691,9 +691,9 @@ class GoalView(ModelViewSet):
 
     def destroy(self, request, pk=None):
         goal = self.get_queryset().filter(pk=pk).first()
-        goals = {"daily": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
+        goals = {"diary": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
         add_user_activity(request.user,
-                              f"Se eliminó la meta {goals.get(request.data.get('goal_type'))} de {request.data.get('goal_value')}")
+                              f"Eliminó la meta {goals.get(request.data.get('goal_type'))} de {request.data.get('goal_value')}")
         goal.delete()
         return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -743,7 +743,7 @@ class InvoicePaymentMethodsView(APIView):
                     new_payment_methods.append(method.get("name"))
 
                 add_user_activity(request.user,
-                                  f"Se actualizaron los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
+                                  f"Actualizó los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
 
                 if 'payment_terminal_id' in request.data:
                     invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)
