@@ -135,7 +135,7 @@ class ReportExporter(APIView):
         apply_styles_to_cells(1, 1, last_column, last_row, ws, alignment=Alignment(horizontal="center"))
 
         wb.save(response)
-        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte diario de ventas el {datetime.now()}")
+        add_user_activity(request.user, f"Descargó el reporte diario de ventas desde {request.data.get('start_date')} hasta {request.data.get('end_date')}")
         return response
 
 
@@ -175,7 +175,7 @@ class InventoriesReportExporter(APIView):
 
         wb.save(response)
 
-        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de inventarios el {datetime.now()}")
+        add_user_activity(request.user, f"Descargó el reporte de inventarios desde {request.data.get('start_date')} hasta {request.data.get('end_date')}")
         return response
 
 
@@ -237,7 +237,7 @@ class ItemsReportExporter(APIView):
 
         wb.save(response)
 
-        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de ventas de productos el {datetime.now()}")
+        add_user_activity(request.user, f"Descargó el reporte de ventas de productos desde {request.data.get('start_date')} hasta {request.data.get('end_date')}")
         return response
 
 
@@ -279,7 +279,7 @@ class InvoicesReportExporter(APIView):
 
         wb.save(response)
 
-        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de facturación el {datetime.now()}")
+        add_user_activity(request.user, f"Descargó el reporte de facturación desde {request.data.get('start_date')} hasta {request.data.get('end_date')}")
         return response
 
 
@@ -454,5 +454,5 @@ class ElectronicInvoiceExporter(APIView):
 
         wb.save(response)
 
-        add_user_activity(request.user, f"{request.user.fullname} descargó el reporte de facturación electrónica el {datetime.now()}")
+        add_user_activity(request.user, f"Descargó el reporte de facturación electrónica {start} hasta {end}")
         return response
