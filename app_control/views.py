@@ -5,18 +5,18 @@ from django.db import transaction
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod, InventoryMovement
 from inventory_api import settings
 
 from .serializers import (
     GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, DianSerializer, PaymentTerminalSerializer, ProviderSerializer,
-    Customer, CustomerSerializer, InvoiceSimpleSerializer
+    Customer, CustomerSerializer, InvoiceSimpleSerializer, InventoryMovementSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
-from inventory_api.utils import CustomPagination, get_query, filter_company
+from inventory_api.utils import CustomPagination, get_query, filter_company, manage_inventories
 from django.db.models import Count, Sum
 import csv
 import codecs
@@ -139,6 +139,128 @@ class ProviderView(ModelViewSet):
         provider.save()
         serializer = self.serializer_class(provider)
         return Response(serializer.data)
+
+
+class InventoryMovementView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
+    queryset = InventoryMovement.objects.select_related(
+        "created_by")
+    serializer_class = InventoryMovementSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "event_type", "state", "inventory__name"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+
+        return results.order_by('id')
+
+    def create(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                request.data.update({"created_by_id": request.user.id})
+                request.data.update({"company_id": request.user.company_id})
+
+                if request.data.get("state") != "pending" and request.data.get("state") is not None:
+                    raise Exception("El estado inicial del movimiento debe ser pendiente")
+
+                inventory = Inventory.objects.filter(pk=request.data.get("inventory_id")).first()
+
+                try:
+                    manage_inventories(inventory, request.data.get("quantity"),
+                                   request.data.get("origin"), request.data.get("destination"),
+                                   request.data.get("event_type"), for_approval=False)
+                except Exception as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                add_user_activity(request.user,
+                                  f"{request.user.fullname} creó un movimiento de inventario "
+                                  f"de {request.data.get('event_type')} "
+                                  f"para el producto {request.data.get('inventory__name')}")
+                return super().create(request, *args, **kwargs)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, pk):
+        request.data.update({"company_id": request.user.company_id})
+        movement = self.get_queryset().filter(pk=pk).first()
+
+        if movement is None:
+            return Response({'error': 'Movimiento de inventario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        inventory_id = request.data.get("inventory_id") if request.data.get("inventory_id") else movement.inventory_id
+        origin = request.data.get("origin") if request.data.get("origin") else movement.origin
+        destination = request.data.get("destination") if request.data.get("destination") else movement.destination
+        quantity = request.data.get("quantity") if request.data.get("quantity") else movement.quantity
+        event_type = request.data.get("event_type") if request.data.get("event_type") else movement.event_type
+
+        inventory = Inventory.objects.filter(pk=inventory_id).first()
+
+        try:
+            manage_inventories(inventory, quantity,
+                               origin, destination,
+                               event_type, for_approval=False)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.serializer_class(movement, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            add_user_activity(request.user,
+                              f"{request.user.fullname} actualizó el movimiento de inventario "
+                              f"de {request.data.get('event_type')} "
+                              f"para el producto {request.data.get('inventory__name')}")
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, pk):
+        movement = self.get_queryset().filter(pk=pk).first()
+
+        if movement is None:
+            return Response({'error': 'Movimiento de inventario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        movement.delete()
+        add_user_activity(request.user,
+                          f"{request.user.fullname} eliminó el movimiento de inventario "
+                          f"de {movement.event_type} "
+                          f"para el producto {movement.inventory.name}")
+        return Response({"message": "Movimiento de inventario eliminado satisfactoriamente"},
+                        status=status.HTTP_200_OK)
+
+    def approve(self, request, pk):
+        try:
+            with transaction.atomic():
+                movement = self.get_queryset().filter(pk=pk).first()
+
+                if movement is None:
+                    return Response({'error': 'Movimiento de inventario no encontrado'},
+                                    status=status.HTTP_404_NOT_FOUND)
+
+                if movement.state != "pending":
+                    return Response({'error': 'Movimiento de inventario ya aprobado'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                try:
+                    manage_inventories(movement.inventory, movement.quantity,
+                                       movement.origin, movement.destination, movement.event_type, for_approval=True)
+                except Exception as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                movement.state = "approved"
+                movement.save()
+                serializer = self.serializer_class(movement)
+                return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CustomerView(ModelViewSet):
@@ -363,7 +485,8 @@ class InvoiceView(ModelViewSet):
         try:
             with transaction.atomic():
                 request.data.update({"company_id": request.user.company_id})
-                dian_resolution = filter_company(DianResolution.objects, self.request.user.company_id).filter(active=True).first()
+                dian_resolution = filter_company(DianResolution.objects, self.request.user.company_id).filter(
+                    active=True).first()
                 if not dian_resolution:
                     raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
 
