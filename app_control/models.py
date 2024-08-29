@@ -11,6 +11,12 @@ PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
 Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
                   ("CE", "CC"), ("TI", "TI"), ("DIE", "DIE"))
 
+InventoryEvents = (("purchase", "purchase"), ("shipment", "shipment"), ("return", "return"))
+
+MovementStates = (("pending", "pending"), ("approved", "approved"), ("rejected", "rejected"))
+
+StorageTypes = (("store", "store"), ("warehouse", "warehouse"))
+
 
 class InventoryGroup(models.Model):
     created_by = models.ForeignKey(
@@ -386,3 +392,33 @@ class Goals(models.Model):
 
     def __str__(self):
         return f"{self.get_goal_type_display()} - {self.goal_value}"
+
+
+class InventoryMovement(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="inventory_moves",
+        on_delete=models.SET_NULL
+    )
+    inventory = models.ForeignKey(
+        Inventory, related_name="inventory_moves_product", on_delete=models.CASCADE
+    )
+    event_type = models.CharField(max_length=255, choices=InventoryEvents, default="purchase")
+    created_at = models.DateTimeField(auto_now_add=True)
+    event_date = models.DateTimeField(null=True)
+    company = models.ForeignKey(
+        Company, null=True, related_name="inventory_logs_company",
+        on_delete=models.DO_NOTHING
+    )
+    quantity = models.PositiveIntegerField(default=0)
+    provider = models.ForeignKey(
+        Provider, related_name="inventory_logs_provider", on_delete=models.CASCADE)
+    origin = models.CharField(max_length=255, choices=StorageTypes, null=True)
+    destination = models.CharField(max_length=255, choices=StorageTypes, null=True)
+    state = models.CharField(max_length=255, choices=MovementStates, default="pending")
+    updated_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.inventory.name} - {self.action}"
