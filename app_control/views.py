@@ -247,14 +247,14 @@ class InventoryMovementView(ModelViewSet):
         try:
             with transaction.atomic():
                 movement = self.get_queryset().filter(pk=pk).first()
-
+                
                 if state not in ["approve", "reject", "override"]:
                     return Response({'error': 'Tipo de acción no válida'}, status=status.HTTP_400_BAD_REQUEST)
 
                 if movement is None:
                     return Response({'error': 'Movimiento de inventario no encontrado'},
                                     status=status.HTTP_404_NOT_FOUND)
-
+                  
                 if state == "approve":
                     try:
                         if movement.state != "pending":

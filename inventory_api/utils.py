@@ -615,3 +615,4 @@ def manage_inventories(inventory, quantity, origin, destination, event, mode="ap
         raise Exception("Evento invalido revisar tipo, origen y destino")
 
     inventory.save() if mode == "approval" or mode == "override" else None
+

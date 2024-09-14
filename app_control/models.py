@@ -16,6 +16,7 @@ InventoryEvents = (("purchase", "purchase"), ("shipment", "shipment"), ("return"
 MovementStates = (("pending", "pending"), ("approved", "approved"),
                   ("rejected", "rejected"), ("overrided", "overrided"))
 
+
 StorageTypes = (("store", "store"), ("warehouse", "warehouse"))
 
 
@@ -394,6 +395,7 @@ class Goals(models.Model):
     def __str__(self):
         return f"{self.get_goal_type_display()} - {self.goal_value}"
 
+      
 class InventoryMovement(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="inventory_moves",
@@ -414,6 +416,7 @@ class InventoryMovement(models.Model):
     delivery_date = models.DateTimeField(null=True)
     delivery_notes = models.TextField(null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
+
 
     class Meta:
         ordering = ("-created_at",)

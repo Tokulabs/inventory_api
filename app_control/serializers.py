@@ -2,6 +2,7 @@ from django.db.models import Sum
 
 from .models import (Goals, Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution,
                      PaymentTerminal, Provider, Customer, Document_types, InventoryMovement, InventoryMovementItem)
+
 from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, \
     PaymentTerminal
 from user_control.serializers import CustomUserSerializer, CustomUserNamesSerializer, CompanySerializer
@@ -232,7 +233,7 @@ class GoalSerializer(serializers.ModelSerializer):
         model = Goals
         fields = ['id', 'goal_type', 'goal_value', 'company_id']
 
-
+        
 class InventoryMovementItemSerializer(serializers.ModelSerializer):
     inventory_id = serializers.CharField(write_only=True)
     inventory = InventorySerializer(read_only=True)
@@ -254,7 +255,7 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryMovement
         exclude = ("company",)
-
+        
     def create(self, validated_data):
         movement_items = validated_data.pop("inventory_movement_items", [])
 
