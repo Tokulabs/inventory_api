@@ -5,13 +5,14 @@ from django.db import transaction
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod, InventoryMovement
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod, InventoryMovement, \
+    InventoryMovementItem
 from inventory_api import settings
 
 from .serializers import (
     GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, DianSerializer, PaymentTerminalSerializer, ProviderSerializer,
-    Customer, CustomerSerializer, InvoiceSimpleSerializer, InventoryMovementSerializer
+    Customer, CustomerSerializer, InvoiceSimpleSerializer, InventoryMovementSerializer, InventoryMovementItemSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
@@ -144,7 +145,7 @@ class ProviderView(ModelViewSet):
 class InventoryMovementView(ModelViewSet):
     http_method_names = ('get', 'post', 'put', 'delete')
     queryset = InventoryMovement.objects.select_related(
-        "created_by")
+        "created_by").prefetch_related("inventory_movement_items")
     serializer_class = InventoryMovementSerializer
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
@@ -173,54 +174,61 @@ class InventoryMovementView(ModelViewSet):
                 if request.data.get("state") != "pending" and request.data.get("state") is not None:
                     raise Exception("El estado inicial del movimiento debe ser pendiente")
 
-                inventory = Inventory.objects.filter(pk=request.data.get("inventory_id")).first()
+                movement_items = request.data.get("inventory_movement_items")
+                for item in movement_items:
+                    inventory = Inventory.objects.filter(pk=item.get("inventory_id")).first()
 
-                try:
-                    manage_inventories(inventory, request.data.get("quantity"),
-                                   request.data.get("origin"), request.data.get("destination"),
-                                   request.data.get("event_type"), for_approval=False)
-                except Exception as e:
-                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        manage_inventories(inventory, item.get("quantity"),
+                                           request.data.get("origin"), request.data.get("destination"),
+                                           request.data.get("event_type"), mode="check")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
                 add_user_activity(request.user,
                                   f"{request.user.fullname} creó un movimiento de inventario "
-                                  f"de {request.data.get('event_type')} "
-                                  f"para el producto {request.data.get('inventory__name')}")
+                                  f"de {request.data.get('event_type')}")
                 return super().create(request, *args, **kwargs)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def update(self, request, pk):
-        request.data.update({"company_id": request.user.company_id})
-        movement = self.get_queryset().filter(pk=pk).first()
-
-        if movement is None:
-            return Response({'error': 'Movimiento de inventario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-
-        inventory_id = request.data.get("inventory_id") if request.data.get("inventory_id") else movement.inventory_id
-        origin = request.data.get("origin") if request.data.get("origin") else movement.origin
-        destination = request.data.get("destination") if request.data.get("destination") else movement.destination
-        quantity = request.data.get("quantity") if request.data.get("quantity") else movement.quantity
-        event_type = request.data.get("event_type") if request.data.get("event_type") else movement.event_type
-
-        inventory = Inventory.objects.filter(pk=inventory_id).first()
-
         try:
-            manage_inventories(inventory, quantity,
-                               origin, destination,
-                               event_type, for_approval=False)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            with transaction.atomic():
+                request.data.update({"company_id": request.user.company_id})
+                movement = self.get_queryset().filter(pk=pk).first()
 
-        serializer = self.serializer_class(movement, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            add_user_activity(request.user,
-                              f"{request.user.fullname} actualizó el movimiento de inventario "
-                              f"de {request.data.get('event_type')} "
-                              f"para el producto {request.data.get('inventory__name')}")
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                if movement is None:
+                    return Response({'error': 'Movimiento de inventario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+                if movement.state != "pending":
+                    return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                origin = request.data.get("origin")
+                destination = request.data.get("destination")
+                event_type = request.data.get("event_type")
+                movement_items = request.data.get("inventory_movement_items") if request.data.get("inventory_movement_items") \
+                    else InventoryMovementItem.objects.filter(inventory_movement_id=movement.id).values()
+
+                for item in movement_items:
+                    inventory = Inventory.objects.filter(pk=item.get("inventory_id")).first()
+                    try:
+                        manage_inventories(inventory, item.get("quantity"),
+                                           origin, destination, event_type, mode="check")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                serializer = self.serializer_class(movement, data=request.data)
+                if serializer.is_valid():
+                    serializer.save()
+                    add_user_activity(request.user,
+                                      f"{request.user.fullname} actualizó el movimiento de inventario "
+                                      f"de {request.data.get('event_type')}")
+                    return Response(serializer.data)
+                return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def destroy(self, request, pk):
         movement = self.get_queryset().filter(pk=pk).first()
@@ -231,36 +239,137 @@ class InventoryMovementView(ModelViewSet):
         movement.delete()
         add_user_activity(request.user,
                           f"{request.user.fullname} eliminó el movimiento de inventario "
-                          f"de {movement.event_type} "
-                          f"para el producto {movement.inventory.name}")
+                          f"de {movement.event_type}")
         return Response({"message": "Movimiento de inventario eliminado satisfactoriamente"},
                         status=status.HTTP_200_OK)
 
-    def approve(self, request, pk):
+    def change_state(self, request, pk, state):
         try:
             with transaction.atomic():
                 movement = self.get_queryset().filter(pk=pk).first()
+
+                if state not in ["approve", "reject", "override"]:
+                    return Response({'error': 'Tipo de acción no válida'}, status=status.HTTP_400_BAD_REQUEST)
 
                 if movement is None:
                     return Response({'error': 'Movimiento de inventario no encontrado'},
                                     status=status.HTTP_404_NOT_FOUND)
 
-                if movement.state != "pending":
-                    return Response({'error': 'Movimiento de inventario ya aprobado'},
+                if state == "approve":
+                    try:
+                        if movement.state != "pending":
+                            return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                            status=status.HTTP_400_BAD_REQUEST)
+
+                        movement_items = InventoryMovementItem.objects.filter(inventory_movement_id=movement.id,
+                                                                              state="pending").all()
+                        for item in movement_items:
+                            manage_inventories(item.inventory, item.quantity,
+                                               movement.origin, movement.destination, movement.event_type,
+                                               mode="approval")
+                            item.state = "approved"
+                            item.save()
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement.state = "approved"
+                    movement.save()
+                    serializer = self.serializer_class(movement)
+                    return Response(serializer.data)
+                elif state == "override":
+                    if movement.state != "approved":
+                        return Response({'error': 'Movimiento no aprobado, solo se puede invalidar movimientos aprobados'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        movement_items = InventoryMovementItem.objects.filter(inventory_movement_id=movement.id,
+                                                                              state="approved").all()
+                        for item in movement_items:
+                            if item.state != "approved":
+                                return Response(
+                                    {'error': 'Movimiento no aprobado, solo se puede invalidar movimientos aprobados'},
                                     status=status.HTTP_400_BAD_REQUEST)
+                            manage_inventories(item.inventory, item.quantity,
+                                               movement.origin, movement.destination, movement.event_type,
+                                               mode="override")
+                            item.state = "overrided"
+                            item.save()
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-                try:
-                    manage_inventories(movement.inventory, movement.quantity,
-                                       movement.origin, movement.destination, movement.event_type, for_approval=True)
-                except Exception as e:
-                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-                movement.state = "approved"
-                movement.save()
-                serializer = self.serializer_class(movement)
-                return Response(serializer.data)
+                    movement.state = "overrided"
+                    movement.save()
+                    serializer = self.serializer_class(movement)
+                    return Response(serializer.data)
+                else:
+                    if movement.state != "pending":
+                        return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                    movement.state = "rejected"
+                    movement.save()
+                    serializer = self.serializer_class(movement)
+                    return Response(serializer.data)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def change_state_item(self, request, pk, state):
+        try:
+            with transaction.atomic():
+                movement_item = InventoryMovementItem.objects.filter(pk=pk).first()
+
+                if state not in ["approve", "reject", "override"]:
+                    return Response({'error': 'Tipo de acción no válida'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if movement_item is None:
+                    return Response({'error': 'Producto de Movimiento no encontrado'},
+                                    status=status.HTTP_404_NOT_FOUND)
+
+                movement = InventoryMovement.objects.filter(pk=movement_item.inventory.id, state="pending").first()
+
+                if state == "approve":
+                    if movement_item.state != "pending" or movement.state != "pending":
+                        return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        manage_inventories(movement_item.inventory, movement_item.quantity,
+                                           movement.origin, movement.destination, movement.event_type,
+                                           mode="approval")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement_item.state = "approved"
+                    movement_item.save()
+                    serializer = InventoryMovementItemSerializer(movement_item)
+                    return Response(serializer.data)
+                elif state == "override":
+                    if movement_item.state != "approved":
+                        return Response({'error': 'Movimiento no aprobado, solo se puede invalidar movimientos aprobados'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        print("Overriding changes")
+                        manage_inventories(movement_item.inventory, movement_item.quantity,
+                                           movement.origin, movement.destination, movement.event_type,
+                                           mode="override")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement_item.state = "overrided"
+                    movement_item.save()
+                    serializer = InventoryMovementItemSerializer(movement_item)
+                    return Response(serializer.data)
+                else:
+                    if movement_item.state != "pending" or movement.state != "pending":
+                        return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    movement_item.state = "rejected"
+                    movement_item.save()
+                    serializer = InventoryMovementItemSerializer(movement_item)
+                    return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CustomerView(ModelViewSet):

@@ -13,7 +13,8 @@ Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
 
 InventoryEvents = (("purchase", "purchase"), ("shipment", "shipment"), ("return", "return"))
 
-MovementStates = (("pending", "pending"), ("approved", "approved"), ("rejected", "rejected"))
+MovementStates = (("pending", "pending"), ("approved", "approved"),
+                  ("rejected", "rejected"), ("overrided", "overrided"))
 
 StorageTypes = (("store", "store"), ("warehouse", "warehouse"))
 
@@ -393,14 +394,10 @@ class Goals(models.Model):
     def __str__(self):
         return f"{self.get_goal_type_display()} - {self.goal_value}"
 
-
 class InventoryMovement(models.Model):
     created_by = models.ForeignKey(
         CustomUser, null=True, related_name="inventory_moves",
         on_delete=models.SET_NULL
-    )
-    inventory = models.ForeignKey(
-        Inventory, related_name="inventory_moves_product", on_delete=models.CASCADE
     )
     event_type = models.CharField(max_length=255, choices=InventoryEvents, default="purchase")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -409,16 +406,38 @@ class InventoryMovement(models.Model):
         Company, null=True, related_name="inventory_logs_company",
         on_delete=models.DO_NOTHING
     )
-    quantity = models.PositiveIntegerField(default=0)
     provider = models.ForeignKey(
         Provider, related_name="inventory_logs_provider", on_delete=models.CASCADE)
     origin = models.CharField(max_length=255, choices=StorageTypes, null=True)
     destination = models.CharField(max_length=255, choices=StorageTypes, null=True)
     state = models.CharField(max_length=255, choices=MovementStates, default="pending")
-    updated_at = models.DateTimeField(auto_now_add=True, null=True)
+    delivery_date = models.DateTimeField(null=True)
+    delivery_notes = models.TextField(null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
 
     class Meta:
         ordering = ("-created_at",)
 
     def __str__(self):
         return f"{self.inventory.name} - {self.action}"
+
+
+class InventoryMovementItem(models.Model):
+    inventory_movement = models.ForeignKey(
+        InventoryMovement, related_name="inventory_movement_items", on_delete=models.CASCADE)
+    inventory = models.ForeignKey(
+        Inventory, related_name="movement_item", on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=0, null=False)
+    state = models.CharField(max_length=255, choices=MovementStates, default="pending")
+    delivery_date = models.DateTimeField(null=True)
+    delivery_notes = models.TextField(null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    company = models.ForeignKey(
+        Company, null=True, related_name="inventory_movement_item_company",
+        on_delete=models.DO_NOTHING
+    )
+
+    class Meta:
+        ordering = ("-updated_at",)
