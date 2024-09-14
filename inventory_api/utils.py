@@ -596,23 +596,23 @@ def electronic_invoice_report_by_invoice(ws, payment_methods_data, amount_data):
     ws.delete_cols(3, 2)
 
 
-def manage_inventories(inventory, quantity, origin, destination, event, for_approval):
+def manage_inventories(inventory, quantity, origin, destination, event, mode="approval"):
     if event == "purchase" and destination == "warehouse" and origin is None:
-        inventory.total_in_storage += quantity if for_approval else 0
+        inventory.total_in_storage += quantity if mode == "approval" else -quantity if mode == "override" else 0
     elif event == "purchase" and destination == "store" and origin is None:
-        inventory.total_in_shops += quantity if for_approval else 0
+        inventory.total_in_shops += quantity if mode == "approval" else -quantity if mode == "override" else 0
     elif event == "shipment" and destination == "warehouse" and origin == "store":
-        inventory.total_in_storage += quantity if for_approval else 0
-        inventory.total_in_shops -= quantity if for_approval else 0
+        inventory.total_in_storage += quantity if mode == "approval" else -quantity if mode == "override" else 0
+        inventory.total_in_shops -= quantity if mode == "approval" else -quantity if mode == "override" else 0
     elif event == "shipment" and destination == "store" and origin == "warehouse":
-        inventory.total_in_storage -= quantity if for_approval else 0
-        inventory.total_in_shops += quantity if for_approval else 0
+        inventory.total_in_storage -= quantity if mode == "approval" else -quantity if mode == "override" else 0
+        inventory.total_in_shops += quantity if mode == "approval" else -quantity if mode == "override" else 0
     elif event == "return" and origin == "warehouse" and destination is None:
-        inventory.total_in_storage -= quantity if for_approval else 0
+        inventory.total_in_storage -= quantity if mode == "approval" else -quantity if mode == "override" else 0
     elif event == "return" and origin == "store" and destination is None:
-        inventory.total_in_shops -= quantity if for_approval else 0
+        inventory.total_in_shops -= quantity if mode == "approval" else -quantity if mode == "override" else 0
     else:
         raise Exception("Evento invalido revisar tipo, origen y destino")
 
-    inventory.save() if for_approval else None
+    inventory.save() if mode == "approval" or mode == "override" else None
 
