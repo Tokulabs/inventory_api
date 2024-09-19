@@ -527,9 +527,10 @@ class InvoiceSimpleListView(ModelViewSet):
         data.pop("page", None)
 
         keyword = data.pop("keyword", None)
-        results = filter_company(self.queryset, self.request.user.company_id
-                                 ).filter(**data).filter(
-            invoice_items__is_gift=False)
+        
+        results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
+                                                 ).prefetch_related("invoice_items", "payment_methods"
+                                                                    ).filter(**data)
 
         if keyword:
             search_fields = (
@@ -539,8 +540,8 @@ class InvoiceSimpleListView(ModelViewSet):
             results = results.filter(query)
 
         return results.annotate(
-            total_sum=Sum("invoice_items__amount"),
-            total_sum_usd=Sum("invoice_items__usd_amount")
+            total_sum=Sum("invoice_items__amount", filter=Q(invoice_items__is_gift=False)),
+            total_sum_usd=Sum("invoice_items__usd_amount", filter=Q(invoice_items__is_gift=False))
         ).order_by('-created_at')
 
 
