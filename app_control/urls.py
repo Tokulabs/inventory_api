@@ -1,10 +1,14 @@
 from django.urls import path, include
+
+from .reports import ReportExporter, InventoriesReportExporter, ItemsReportExporter, InvoicesReportExporter, \
+    ElectronicInvoiceExporter
+from .stats import SummaryView, HourlySalesQuantities, SalesBySelectedTimeframeSummary, PurchaseView, SalePerformance, \
+    SalesByUsersView
 from .views import (
-    DianResolutionView, GoalView, InventoryView, SummaryView, InvoiceView, PurchaseView,
-    InventoryGroupView, SalePerformance, InventoryCSVLoaderView, UpdateInvoiceView,
-    PaymentTerminalView, ReportExporter, ProviderView, SalesByUsersView, InventoriesReportExporter, ItemsReportExporter,
-    InvoicesReportExporter, CustomerView, InvoicePainterView, ElectronicInvoiceExporter, InvoiceSimpleListView,
-    HourlySalesQuantities, SalesBySelectedTimeframeSummary, InvoicePaymentMethodsView, UploadFileView
+    DianResolutionView, GoalView, InventoryView, InvoiceView,
+    InventoryGroupView, InventoryCSVLoaderView, UpdateInvoiceView,
+    PaymentTerminalView, ProviderView, CustomerView, InvoicePainterView, InvoiceSimpleListView,
+    InvoicePaymentMethodsView, UploadFileView
 )
 
 from rest_framework.routers import DefaultRouter

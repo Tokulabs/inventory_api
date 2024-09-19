@@ -4,7 +4,7 @@ from .models import (Goals, Inventory, InventoryGroup, PaymentMethod, Invoice, I
                      PaymentTerminal, Provider, Customer, Document_types)
 from .models import Inventory, InventoryGroup, PaymentMethod, Invoice, InvoiceItem, DianResolution, Provider, \
     PaymentTerminal
-from user_control.serializers import CustomUserSerializer, CustomUserNamesSerializer
+from user_control.serializers import CustomUserSerializer, CustomUserNamesSerializer, CompanySerializer
 from rest_framework import serializers
 
 
@@ -14,10 +14,11 @@ class InventoryGroupSerializer(serializers.ModelSerializer):
     belongs_to = serializers.SerializerMethodField(read_only=True)
     belongs_to_id = serializers.CharField(write_only=True, required=False)
     total_items = serializers.CharField(read_only=True, required=False)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = InventoryGroup
-        fields = "__all__"
+        exclude = ("company",)
 
     def get_belongs_to(self, obj):
         if obj.belongs_to is not None:
@@ -28,10 +29,11 @@ class InventoryGroupSerializer(serializers.ModelSerializer):
 class ProviderSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Provider
-        fields = "__all__"
+        exclude = ("company",)
 
 
 class InventorySerializer(serializers.ModelSerializer):
@@ -41,11 +43,11 @@ class InventorySerializer(serializers.ModelSerializer):
     group_id = serializers.CharField(write_only=True)
     provider = ProviderSerializer(read_only=True)
     provider_id = serializers.CharField(write_only=True)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Inventory
-        fields = "__all__"
-
+        exclude = ("company",)
 
 
 class UserWithAmountSerializer(serializers.Serializer):
@@ -57,10 +59,11 @@ class CustomerSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
     document_type = serializers.ChoiceField(Document_types)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Customer
-        fields = "__all__"
+        exclude = ("company",)
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
@@ -68,10 +71,11 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
     invoice_id = serializers.CharField(write_only=True)
     item = InventorySerializer(read_only=True)
     item_id = serializers.CharField(write_only=True)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = InvoiceItem
-        fields = "__all__"
+        exclude = ("company",)
 
 
 class InvoiceItemDataSerializer(serializers.Serializer):
@@ -84,28 +88,32 @@ class InvoiceItemDataSerializer(serializers.Serializer):
 
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
+    company_id = serializers.IntegerField(required=False)
+
     class Meta:
         model = PaymentMethod
         fields = ["name", "paid_amount", "received_amount",
-                  "back_amount", "transaction_code"]
+                  "back_amount", "transaction_code", "company_id"]
 
 
 class PaymentTerminalSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = PaymentTerminal
-        fields = "__all__"
+        exclude = ("company",)
 
 
 class DianSerializer(serializers.ModelSerializer):
     created_by = CustomUserSerializer(read_only=True)
     created_by_id = serializers.CharField(write_only=True, required=False)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = DianResolution
-        fields = "__all__"
+        exclude = ("company",)
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
@@ -122,10 +130,11 @@ class InvoiceSerializer(serializers.ModelSerializer):
     sale_by_id = serializers.CharField(write_only=True, required=False)
     dian_resolution = DianSerializer(read_only=True)
     dian_resolution_id = serializers.CharField(write_only=True, required=False)
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Invoice
-        fields = "__all__"
+        exclude = ("company",)
 
     def create(self, validated_data):
         invoice_item_data = validated_data.pop("invoice_item_data")
@@ -140,7 +149,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         invoice = super().create(validated_data)
 
         invoice_item_serializer = InvoiceItemSerializer(data=[
-            {"invoice_id": invoice.id, **item} for item in invoice_item_data
+            {"invoice_id": invoice.id,
+             "company_id": validated_data["company_id"],
+             **item} for item in invoice_item_data
         ], many=True)
 
         if invoice_item_serializer.is_valid():
@@ -151,7 +162,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
         for payment_method_data in payment_methods_data:
             PaymentMethod.objects.create(
-                invoice=invoice, **payment_method_data)
+                invoice=invoice,
+                company_id=validated_data["company_id"],
+                **payment_method_data)
 
         return invoice
 
@@ -204,13 +217,17 @@ class InvoiceSimpleSerializer(serializers.ModelSerializer):
     sale_by = CustomUserNamesSerializer(read_only=True)
     total_sum = serializers.FloatField()
     total_sum_usd = serializers.FloatField()
+    company_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Invoice
         fields = ("invoice_number", "is_dollar", "is_override", "created_at",
-                  "payment_terminal", "payment_methods", "sale_by", "total_sum", "total_sum_usd")
+                  "payment_terminal", "payment_methods", "sale_by", "total_sum", "total_sum_usd", "company_id")
+
 
 class GoalSerializer(serializers.ModelSerializer):
+    company_id = serializers.IntegerField(required=False)
+
     class Meta:
         model = Goals
-        fields = ['id', 'goal_type', 'goal_value']
+        fields = ['id', 'goal_type', 'goal_value', 'company_id']
