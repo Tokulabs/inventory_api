@@ -2,6 +2,7 @@ from datetime import date
 
 import boto3
 from django.db import transaction
+from django.db.models.functions.comparison import Coalesce
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
@@ -17,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 from inventory_api.utils import CustomPagination, get_query, filter_company
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 import csv
 import codecs
 from user_control.views import add_user_activity
@@ -411,8 +412,8 @@ class InvoiceSimpleListView(ModelViewSet):
             results = results.filter(query)
 
         return results.annotate(
-            total_sum=Sum("invoice_items__amount", filter=Q(invoice_items__is_gift=False)),
-            total_sum_usd=Sum("invoice_items__usd_amount", filter=Q(invoice_items__is_gift=False))
+            total_sum=Coalesce(Sum("invoice_items__amount", filter=Q(invoice_items__is_gift=False)), 0.0),
+            total_sum_usd=Coalesce(Sum("invoice_items__usd_amount", filter=Q(invoice_items__is_gift=False)), 0.0)
         ).order_by('-created_at')
 
 
