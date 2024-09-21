@@ -400,9 +400,8 @@ class InvoiceSimpleListView(ModelViewSet):
 
         keyword = data.pop("keyword", None)
         
-        results = Invoice.objects.select_related("created_by", "sale_by", "payment_terminal"
-                                                 ).prefetch_related("invoice_items", "payment_methods"
-                                                                    ).filter(**data)
+        results = filter_company(self.queryset, self.request.user.company_id
+                                 ).filter(**data).filter(**data)
 
         if keyword:
             search_fields = (
