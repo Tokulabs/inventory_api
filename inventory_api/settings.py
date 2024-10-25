@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'user_control',
     'app_control',
-    'e-invoice_control'
+    'einvoice_control'
 ]
 
 MIDDLEWARE = [
