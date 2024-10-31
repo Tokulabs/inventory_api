@@ -37,7 +37,7 @@ class CreateUserView(ModelViewSet):
 
         print(request.user.fullname)
 
-        add_user_activity(request.user, f"Nuevo usuario creado por: '{request.user.fullname}'")
+        add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
         
         return Response(
             {"success": "Usuario creado satisfactoriamente"},
@@ -86,7 +86,7 @@ class LoginView(ModelViewSet):
         user.last_login = datetime.now()
         user.save()
 
-        add_user_activity(user, f"'{user.fullname}' inició sesión el '{user.last_login}'")
+        add_user_activity(user, "Nuevo inicio de sesión")
 
         return Response({"access": access})
 
@@ -111,7 +111,7 @@ class UpdatePasswordView(ModelViewSet):
         user.set_password(valid_request._validated_data["password"])
         user.save()
 
-        add_user_activity(user, f"El usuario '{user.fullname}' actualizó su contraseña")
+        add_user_activity(user, "El usuario actualizó su contraseña")
 
         return Response({"success": "Contraseña actualizada"})
 
@@ -176,7 +176,7 @@ class UsersView(ModelViewSet):
         serializer = self.serializer_class(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"Usuario '{request.user.fullname}' Actualizado")
+            add_user_activity(request.user, f"El usuario fué actualizado '{request.data}'")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -189,6 +189,11 @@ class UsersView(ModelViewSet):
         user.save()
 
         serializer = self.serializer_class(user)
+
+        if user.is_active is False:
+            add_user_activity(request.user, f"Usuario {(serializer.data.get('email'))} desactivado")
+        else:
+            add_user_activity(request.user, f"Usuario {(serializer.data.get('email'))} activado")
         return Response(serializer.data)
 
 

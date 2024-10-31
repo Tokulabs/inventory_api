@@ -49,14 +49,9 @@ class InventoryGroup(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new group - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated group from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted group - '{self.name}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -94,14 +89,9 @@ class Provider(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new provider - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated provider from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted provider - '{self.name}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -143,18 +133,9 @@ class Inventory(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-
         super().save(*args, **kwargs)
 
-        action = f"added new inventory item with code - '{self.code}'"
-
-        if not is_new:
-            action = f"updated inventory item with code - '{self.code}'"
-
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted inventory - '{self.code}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -191,14 +172,9 @@ class Customer(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new customer - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated customer from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted customer - '{self.name}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -228,17 +204,10 @@ class PaymentTerminal(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
         super().save(*args, **kwargs)
-        action = f"added new payment terminal with name - '{self.name}'"
-        if not is_new:
-            action = f"updated payment terminal item with name - '{self.name}'"
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted payment terminal with name - '{self.name}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
 
 class DianResolution(models.Model):
@@ -300,8 +269,6 @@ class Invoice(models.Model):
         ]
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted invoice - '{self.id}'"
         super().delete(*args, **kwargs)
 
 
@@ -368,13 +335,13 @@ class InvoiceItem(models.Model):
 
 
 class Goals(models.Model):
-    DIARY = 'diary'
+    DAILY = 'diary'
     WEEKLY = 'weekly'
     MONTHLY = 'monthly'
     ANNUAL = 'annual'
 
     GOAL_TYPE_CHOICES = [
-        (DIARY, 'Diary'),
+        (DAILY, 'Diary'),
         (WEEKLY, 'Weekly'),
         (MONTHLY, 'Monthly'),
         (ANNUAL, 'Annual'),
