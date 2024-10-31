@@ -10,10 +10,10 @@ Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
 
 
 class Company(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    dian_token = models.CharField(max_length=255, unique=True)
-    nit = models.CharField(max_length=255, unique=True)
-    short_name = models.CharField(max_length=255, unique=True, null=True)
+    name = models.CharField(max_length=255)
+    dian_token = models.CharField(max_length=255)
+    nit = models.CharField(max_length=255)
+    short_name = models.CharField(max_length=255, null=True)
     phone = models.CharField(max_length=255, null=True)
     logo = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -21,6 +21,11 @@ class Company(models.Model):
 
     class Meta:
         ordering = ("created_at", )
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "nit"], name="unique_name_nit"
+            )
+        ]
 
     def __str__(self):
         return self.name

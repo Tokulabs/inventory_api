@@ -8,7 +8,7 @@ from .views import (
     DianResolutionView, GoalView, InventoryView, InvoiceView,
     InventoryGroupView, InventoryCSVLoaderView, UpdateInvoiceView,
     PaymentTerminalView, ProviderView, CustomerView, InvoicePainterView, InvoiceSimpleListView,
-    InvoicePaymentMethodsView, UploadFileView
+    InvoicePaymentMethodsView, UploadFileView, InventoryMovementView
 )
 
 from rest_framework.routers import DefaultRouter
@@ -29,6 +29,7 @@ router.register('invoice-simple-list', InvoiceSimpleListView, "invoice-simple-li
 router.register('hourly-quantities', HourlySalesQuantities, "hourly-quantities")
 router.register('sales-by-timeframe', SalesBySelectedTimeframeSummary, "sales-by-timeframe")
 router.register('goals', GoalView, "goals")
+router.register('inventory-movement', InventoryMovementView, "inventory-movement")
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -50,6 +51,10 @@ urlpatterns = [
     path('electronic_invoice_export/', ElectronicInvoiceExporter.as_view(), name='electronic_invoice_export'),
     path('inventory/<int:pk>/toggle-active/',
          InventoryView.as_view({'post': 'toggle_active'}), name='inventory-toggle'),
+    path('inventory-movement/<int:pk>/change_state/<str:state>/',
+         InventoryMovementView.as_view({'post': 'change_state'}), name='inventory-movement-change-state'),
+    path('inventory-movement/<int:pk>/change_state_item/<str:state>/',
+         InventoryMovementView.as_view({'post': 'change_state_item'}), name='inventory-movement-change-state-item'),
     path('provider/<int:pk>/toggle-active/',
          ProviderView.as_view({'post': 'toggle_active'}), name='provider-toggle'),
     path('payment-terminal/<int:pk>/toggle-active/',

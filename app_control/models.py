@@ -11,6 +11,14 @@ PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
 Document_types = (("CC", "CC"), ("PA", "PA"), ("NIT", "NIT"),
                   ("CE", "CC"), ("TI", "TI"), ("DIE", "DIE"))
 
+InventoryEvents = (("purchase", "purchase"), ("shipment", "shipment"), ("return", "return"))
+
+MovementStates = (("pending", "pending"), ("approved", "approved"),
+                  ("rejected", "rejected"), ("overrided", "overrided"))
+
+
+StorageTypes = (("store", "store"), ("warehouse", "warehouse"))
+
 
 class InventoryGroup(models.Model):
     created_by = models.ForeignKey(
@@ -41,14 +49,9 @@ class InventoryGroup(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new group - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated group from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted group - '{self.name}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -86,14 +89,9 @@ class Provider(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new provider - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated provider from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted provider - '{self.name}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -135,18 +133,9 @@ class Inventory(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-
         super().save(*args, **kwargs)
 
-        action = f"added new inventory item with code - '{self.code}'"
-
-        if not is_new:
-            action = f"updated inventory item with code - '{self.code}'"
-
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted inventory - '{self.code}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -183,14 +172,9 @@ class Customer(models.Model):
         self.old_name = self.name
 
     def save(self, *args, **kwargs):
-        action = f"added new customer - '{self.name}'"
-        if self.pk is not None:
-            action = f"updated customer from - '{self.old_name}' to '{self.name}'"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted customer - '{self.name}'"
         super().delete(*args, **kwargs)
 
     def __str__(self):
@@ -220,17 +204,10 @@ class PaymentTerminal(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
         super().save(*args, **kwargs)
-        action = f"added new payment terminal with name - '{self.name}'"
-        if not is_new:
-            action = f"updated payment terminal item with name - '{self.name}'"
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted payment terminal with name - '{self.name}'"
         super().delete(*args, **kwargs)
-        add_user_activity(created_by, action=action)
 
 
 class DianResolution(models.Model):
@@ -292,8 +269,6 @@ class Invoice(models.Model):
         ]
 
     def delete(self, *args, **kwargs):
-        created_by = self.created_by
-        action = f"deleted invoice - '{self.id}'"
         super().delete(*args, **kwargs)
 
 
@@ -360,13 +335,13 @@ class InvoiceItem(models.Model):
 
 
 class Goals(models.Model):
-    DIARY = 'diary'
+    DAILY = 'diary'
     WEEKLY = 'weekly'
     MONTHLY = 'monthly'
     ANNUAL = 'annual'
 
     GOAL_TYPE_CHOICES = [
-        (DIARY, 'Diary'),
+        (DAILY, 'Diary'),
         (WEEKLY, 'Weekly'),
         (MONTHLY, 'Monthly'),
         (ANNUAL, 'Annual'),
@@ -386,3 +361,53 @@ class Goals(models.Model):
 
     def __str__(self):
         return f"{self.get_goal_type_display()} - {self.goal_value}"
+
+      
+class InventoryMovement(models.Model):
+    created_by = models.ForeignKey(
+        CustomUser, null=True, related_name="inventory_moves",
+        on_delete=models.SET_NULL
+    )
+    event_type = models.CharField(max_length=255, choices=InventoryEvents, default="purchase")
+    created_at = models.DateTimeField(auto_now_add=True)
+    event_date = models.DateTimeField(null=True)
+    company = models.ForeignKey(
+        Company, null=True, related_name="inventory_logs_company",
+        on_delete=models.DO_NOTHING
+    )
+    provider = models.ForeignKey(
+        Provider, related_name="inventory_logs_provider", on_delete=models.CASCADE)
+    origin = models.CharField(max_length=255, choices=StorageTypes, null=True)
+    destination = models.CharField(max_length=255, choices=StorageTypes, null=True)
+    state = models.CharField(max_length=255, choices=MovementStates, default="pending")
+    delivery_date = models.DateTimeField(null=True)
+    delivery_notes = models.TextField(null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.inventory.name} - {self.action}"
+
+
+class InventoryMovementItem(models.Model):
+    inventory_movement = models.ForeignKey(
+        InventoryMovement, related_name="inventory_movement_items", on_delete=models.CASCADE)
+    inventory = models.ForeignKey(
+        Inventory, related_name="movement_item", on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=0, null=False)
+    state = models.CharField(max_length=255, choices=MovementStates, default="pending")
+    delivery_date = models.DateTimeField(null=True)
+    delivery_notes = models.TextField(null=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+    company = models.ForeignKey(
+        Company, null=True, related_name="inventory_movement_item_company",
+        on_delete=models.DO_NOTHING
+    )
+
+    class Meta:
+        ordering = ("-updated_at",)
