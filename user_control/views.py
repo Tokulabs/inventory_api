@@ -1,3 +1,6 @@
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.middleware.csrf import get_token
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Company
@@ -8,8 +11,80 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate
 from datetime import datetime
-from inventory_api.utils import get_access_token, CustomPagination, get_query, filter_company
+from inventory_api.utils import get_access_token, CustomPagination, get_query, filter_company, \
+    create_product_sales_report
 from inventory_api.custom_methods import IsAuthenticatedCustom
+from .utils import authenticate_user, handle_new_password_required, handle_password_update, forgot_password, \
+    confirm_forgot_password, create_cognito_user
+
+
+@csrf_exempt
+def login_view(request):
+    email = request.POST.get('email')
+    password = request.POST.get('password')
+
+    auth_result = authenticate_user(email, password)
+
+    if 'ChallengeName' in auth_result:
+        return JsonResponse({
+            "session": auth_result['Session']
+        })
+
+    elif not auth_result:
+        return JsonResponse({"error": "Invalid credentials"}, status=401)
+    else:
+        access_token = auth_result['AccessToken']
+
+        response = JsonResponse({
+            "access": access_token
+        })
+
+        return response
+
+
+@csrf_exempt
+def password_required_view(request):
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        email = request.POST.get('email')
+        session = request.POST.get('session')
+
+        return handle_new_password_required(email, new_password, session)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@csrf_exempt
+def update_password_view(request):
+    if request.method == 'POST':
+        access_token = request.headers.get('HTTP_AUTHORIZATION').split(" ")[1]
+        old_password = request.POST.get('old_password')
+        new_password = request.POST.get('new_password')
+
+        return handle_password_update(access_token, old_password, new_password)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@csrf_exempt
+def forgot_password_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        return forgot_password(email)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@csrf_exempt
+def confirm_forgot_password_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        confirmation_code = request.POST.get('confirmation_code')
+        new_password = request.POST.get('new_password')
+
+        return confirm_forgot_password(email, confirmation_code, new_password)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
 def add_user_activity(user, action):
@@ -26,19 +101,21 @@ class CreateUserView(ModelViewSet):
     http_method_names = ["post"]
     queryset = CustomUser.objects.all()
     serializer_class = CreateUserSerializer
-    permission_classes = (IsAuthenticatedCustom,)
 
+    @csrf_exempt
     def create(self, request):
         request.data.update({"company_id": request.user.company_id})
         valid_request = self.serializer_class(data=request.data)
         valid_request.is_valid(raise_exception=True)
 
+        sub = create_cognito_user(request.data.get("email"))
+
+        valid_request.validated_data.update({"sub": sub})
+
         CustomUser.objects.create(**valid_request.validated_data)
 
-        print(request.user.fullname)
-
         add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
-        
+
         return Response(
             {"success": "Usuario creado satisfactoriamente"},
             status=status.HTTP_201_CREATED
@@ -155,7 +232,6 @@ class UsersView(ModelViewSet):
     serializer_class = CustomUserSerializer
     queryset = CustomUser.objects.all()
     http_method_names = ("get", "put", "post")
-    permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
 
     def get_queryset(self):

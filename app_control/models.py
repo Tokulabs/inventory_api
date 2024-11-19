@@ -2,7 +2,6 @@ from django.db import models
 from django.db.models import UniqueConstraint
 
 from user_control.models import CustomUser, Company
-from user_control.views import add_user_activity
 
 PaymentMethods = (("cash", "cash"), ("creditCard", "creditCard"), ("debitCard",
                                                                    "debitCard"), ("nequi", "nequi"),

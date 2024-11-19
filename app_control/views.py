@@ -20,7 +20,7 @@ from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
 
 from inventory_api.utils import CustomPagination, get_query, filter_company, manage_inventories
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 
 import csv
 import codecs

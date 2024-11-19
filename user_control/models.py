@@ -69,6 +69,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         Company, null=True, related_name="user_company",
         on_delete=models.DO_NOTHING
     )
+    sub = models.CharField(max_length=255, null=True)
 
     USERNAME_FIELD = "email"
     objects = CustomUserManager()
