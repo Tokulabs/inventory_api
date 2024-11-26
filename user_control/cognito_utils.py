@@ -37,7 +37,6 @@ def create_cognito_user(email):
         client.admin_create_user(
             UserPoolId=settings.USER_POOL_ID,
             Username=email,
-            TemporaryPassword=password,
             UserAttributes=user_attributes
         )
 
