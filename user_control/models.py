@@ -70,6 +70,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         on_delete=models.DO_NOTHING
     )
     sub = models.CharField(max_length=255, null=True)
+    is_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     objects = CustomUserManager()

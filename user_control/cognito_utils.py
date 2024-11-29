@@ -26,10 +26,12 @@ client = boto3.client('cognito-idp', region_name=settings.AWS_REGION_NAME,
                       aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
                       config=config)
 
+ses_client = boto3.client('ses', region_name=settings.AWS_REGION_NAME,
+                          aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                          aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY)
+
 
 def create_cognito_user(email):
-    password = "Password123"
-
     user_attributes = [
         {'Name': 'email', 'Value': email},
     ]
@@ -179,3 +181,19 @@ def confirm_forgot_password(email, confirmation_code, new_password):
     except Exception:
         return Response({"error": "Error en cliente de Cognito"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+def verify_email_send(token):
+    client.get_user_attribute_verification_code(
+        AccessToken=token,
+        AttributeName='email'
+    )
+    return JsonResponse({"message": "Email de verificacion enviado"})
+
+
+def verify_email(token, code):
+    client.verify_user_attribute(
+        AccessToken=token,
+        AttributeName='email',
+        Code=code
+    )
+    return JsonResponse({"message": "Email verificado satisfactoriamente"})

@@ -23,4 +23,6 @@ urlpatterns = [
     path('mail-password-reset', forgot_password_view, name='mail-password-reset'),
     path('password-reset', confirm_forgot_password_view, name='password-reset'),
     path('update-password', UpdatePasswordView.as_view({'post': 'update_password'}), name='update-password'),
+    path('verify_email', UpdatePasswordView.as_view({'post': 'verify_email_view'}), name='verify_email'),
+    path('verify_email_confirm', UpdatePasswordView.as_view({'post': 'verify_email_confirmation_view'}), name='verify_email_confirm')
 ]

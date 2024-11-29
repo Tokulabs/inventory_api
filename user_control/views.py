@@ -4,7 +4,7 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.viewsets import ModelViewSet
 
 from .cognito_utils import authenticate_user, handle_new_password_required, forgot_password, confirm_forgot_password, \
-    handle_password_update, create_cognito_user
+    handle_password_update, create_cognito_user, verify_email_send, verify_email
 from .models import Company
 from .serializers import (CreateUserSerializer, CustomUser, CustomUserSerializer, UserActivitiesSerializer,
                           UserActivities, CompanySerializer)
@@ -58,6 +58,10 @@ def login_view(request):
         })
 
         user = CustomUser.objects.all().filter(email=email).first()
+
+        if user.is_active is False:
+            return JsonResponse({"error": "Error al iniciar sesión"}, status=401)
+
         user.last_login = datetime.now()
         user.save()
 
@@ -156,6 +160,34 @@ class UpdatePasswordView(ModelViewSet):
             response = handle_password_update(access_token, old_password, new_password)
 
             add_user_activity(request.user, "El usuario actualizó su contraseña")
+
+            return response
+
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    def verify_email_view(self, request):
+        if request.method == 'POST':
+            access_token = request.META.get("HTTP_AUTHORIZATION", None)
+            access_token = access_token.split(" ")[1]
+            response = verify_email_send(access_token)
+
+            return response
+
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    def verify_email_confirmation_view(self, request):
+        if request.method == 'POST':
+            access_token = request.META.get("HTTP_AUTHORIZATION", None)
+            access_token = access_token.split(" ")[1]
+            code = request.data.get('code')
+            response = verify_email(access_token, code)
+
+            if response.status_code == 200:
+                user = request.user
+                user.is_verified = True
+                user.save()
+
+                add_user_activity(request.user, "El usuario verificó su correo electrónico")
 
             return response
 
