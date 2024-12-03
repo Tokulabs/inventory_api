@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.status import HTTP_200_OK
@@ -125,21 +126,29 @@ class CreateUserView(ModelViewSet):
     permission_classes = (IsAuthenticatedCustom,)
 
     def create(self, request):
-        request.data.update({"company_id": request.user.company_id})
-        valid_request = self.serializer_class(data=request.data)
-        valid_request.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                request.data.update({"company_id": request.user.company_id})
+                valid_request = self.serializer_class(data=request.data)
+                valid_request.is_valid(raise_exception=True)
 
-        sub = create_cognito_user(request.data.get("email"))
-        valid_request.validated_data.update({"sub": sub})
+                try:
+                    CustomUser.objects.create(**valid_request.validated_data)
+                except Exception:
+                    return Response({"error": "Usuario ya existe"},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
-        CustomUser.objects.create(**valid_request.validated_data)
+                sub = create_cognito_user(request.data.get("email"))
+                valid_request.validated_data.update({"sub": sub})
 
-        add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
+                add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
 
-        return Response(
-            {"success": "Usuario creado satisfactoriamente"},
-            status=status.HTTP_201_CREATED
-        )
+                return Response(
+                    {"success": "Usuario creado satisfactoriamente"},
+                    status=status.HTTP_201_CREATED
+                )
+        except Exception as e:
+            return Response({"error": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UpdatePasswordView(ModelViewSet):
