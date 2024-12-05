@@ -108,6 +108,7 @@ AWS_REGION_NAME = config('AWS_REGION_NAME')
 USER_POOL_ID = config('USER_POOL_ID')
 CLIENT_ID = config('CLIENT_ID')
 COGNITO_PUBLIC_KEYS_URL = config('COGNITO_PUBLIC_KEYS_URL')
+CLIENT_SECRET = config('CLIENT_SECRET')
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators

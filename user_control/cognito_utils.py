@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import hmac
 import warnings
 
 import boto3
@@ -58,16 +61,24 @@ def create_cognito_user(email):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
+def calculate_secret_hash(username):
+    message = username + settings.CLIENT_ID
+    dig = hmac.new(settings.CLIENT_SECRET.encode(), message.encode(), hashlib.sha256).digest()
+    return base64.b64encode(dig).decode()
 
 def authenticate_user(email, password):
     try:
+        secret_hash = calculate_secret_hash(
+            username=email
+        )
         response = client.admin_initiate_auth(
             UserPoolId=settings.USER_POOL_ID,
             ClientId=settings.CLIENT_ID,
             AuthFlow='ADMIN_NO_SRP_AUTH',
             AuthParameters={
                 'USERNAME': email,
-                'PASSWORD': password
+                'PASSWORD': password,
+                'SECRET_HASH': secret_hash
             }
         )
         if 'ChallengeName' in response:
@@ -109,12 +120,16 @@ def validate_token(token):
 
 def handle_new_password_required(email, new_password, session):
     try:
+        secret_hash = calculate_secret_hash(
+            username=email
+        )
         client.respond_to_auth_challenge(
             ClientId=settings.CLIENT_ID,
             ChallengeName='NEW_PASSWORD_REQUIRED',
             ChallengeResponses={
                 'USERNAME': email,
-                'NEW_PASSWORD': new_password
+                'NEW_PASSWORD': new_password,
+                'SECRET_HASH': secret_hash
             },
             Session=session
         )
@@ -152,9 +167,13 @@ def handle_password_update(access_token, old_password, new_password):
 
 def forgot_password(email):
     try:
+        secret_hash = calculate_secret_hash(
+            username=email
+        )
         client.forgot_password(
             ClientId=settings.CLIENT_ID,
-            Username=email
+            Username=email,
+            SecretHash=secret_hash
         )
         return JsonResponse({"message": "Password reset code sent to your email"})
     except client.exceptions.UserNotFoundException:
@@ -165,11 +184,15 @@ def forgot_password(email):
 
 def confirm_forgot_password(email, confirmation_code, new_password):
     try:
+        secret_hash = calculate_secret_hash(
+            username=email
+        )
         client.confirm_forgot_password(
             ClientId=settings.CLIENT_ID,
             Username=email,
             ConfirmationCode=confirmation_code,
-            Password=new_password
+            Password=new_password,
+            SecretHash=secret_hash
         )
         return JsonResponse({"message": "Password has been reset successfully"})
     except client.exceptions.CodeMismatchException:
