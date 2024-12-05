@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
-from .utils import decodeJWT
+
+from user_control.cognito_utils import validate_token
+from user_control.models import CustomUser
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 
@@ -15,7 +17,9 @@ class IsAuthenticatedCustom(BasePermission):
         if not auth_token:
             return False
 
-        user = decodeJWT(auth_token)
+        token = auth_token.split(" ")[1] if auth_token.startswith("Bearer ") else None
+        user_data = validate_token(token)
+        user = CustomUser.objects.all().filter(sub=user_data['sub']).first()
 
         if not user:
             return False

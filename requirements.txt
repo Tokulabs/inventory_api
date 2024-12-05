@@ -1,10 +1,11 @@
 asgiref==3.5.2
 autopep8==2.0.0
 blessed==1.20.0
-boto3==1.34.122
-botocore==1.34.122
+boto3==1.35.65
+botocore==1.35.65
 cement==2.8.2
 certifi==2024.2.2
+cryptography==43.0.3
 charset-normalizer==3.3.2
 colorama==0.4.3
 dj-database-url==1.3.0
@@ -25,6 +26,7 @@ pycodestyle==2.10.0
 PyJWT==2.6.0
 python-dateutil==2.9.0.post0
 python-decouple==3.6
+python-jose==3.3.0
 pytz==2022.6
 PyYAML==6.0.1
 requests==2.31.0

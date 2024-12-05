@@ -6,19 +6,22 @@ from django.db.models.functions.comparison import Coalesce
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 
-from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod
+from app_control.models import DianResolution, Goals, PaymentTerminal, Provider, PaymentMethod, InventoryMovement, \
+    InventoryMovementItem
 from inventory_api import settings
 
 from .serializers import (
     GoalSerializer, Inventory, InventorySerializer, InventoryGroupSerializer, InventoryGroup,
     Invoice, InvoiceSerializer, DianSerializer, PaymentTerminalSerializer, ProviderSerializer,
-    Customer, CustomerSerializer, InvoiceSimpleSerializer
+    Customer, CustomerSerializer, InvoiceSimpleSerializer, InventoryMovementSerializer, InventoryMovementItemSerializer
 )
 from rest_framework.response import Response
 from rest_framework import status
 from inventory_api.custom_methods import IsAuthenticatedCustom
-from inventory_api.utils import CustomPagination, get_query, filter_company
+
+from inventory_api.utils import CustomPagination, get_query, filter_company, manage_inventories
 from django.db.models import Count, Sum, Q
+
 import csv
 import codecs
 from user_control.views import add_user_activity
@@ -48,7 +51,7 @@ class InventoryView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"{request.user.fullname} creó el producto con id: {request.data.get('code')}")
+        add_user_activity(request.user, f"Creó el producto con id: {request.data.get('code')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -61,14 +64,14 @@ class InventoryView(ModelViewSet):
         serializer = self.serializer_class(inventory, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"{request.user.fullname} actualizó el producto: {inventory.code}")
+            add_user_activity(request.user, f"Actualizó el producto {inventory.code}. ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         inventory = self.get_queryset().filter(pk=pk).first()
         inventory.delete()
-        add_user_activity(request.user, f"{request.user.fullname} eliminó el producto con id: {inventory.code}")
+        add_user_activity(request.user, f"Eliminó el producto con id {inventory.code}")
         return Response({"message": "Producto eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -78,6 +81,12 @@ class InventoryView(ModelViewSet):
 
         inventory.active = not inventory.active
         inventory.save()
+
+        if inventory.active is False:
+            add_user_activity(request.user, f"Desactivó el producto {inventory.code}")
+        else:
+            add_user_activity(request.user, f"Activó el producto {inventory.code}")
+
         serializer = self.serializer_class(inventory)
         return Response(serializer.data)
 
@@ -107,7 +116,7 @@ class ProviderView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"{request.user.fullname} creó el proveedor: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó el proveedor {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk):
@@ -121,14 +130,14 @@ class ProviderView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             add_user_activity(request.user,
-                              f"{request.user.fullname} actualizó el proveedor: {request.data.get('name')}")
+                              f"Actualizó el proveedor {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
         provider = self.get_queryset().filter(pk=pk).first()
         provider.delete()
-        add_user_activity(request.user, f"{request.user.fullname} eliminó el proveedor: {provider}")
+        add_user_activity(request.user, f"Eliminó el proveedor {provider}")
         return Response({"message": "Proveedor eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -138,8 +147,245 @@ class ProviderView(ModelViewSet):
 
         provider.active = not provider.active
         provider.save()
+
+        if provider.active is False:
+            add_user_activity(request.user, f"Desactivó el proveedor {provider}")
+        else:
+            add_user_activity(request.user, f"Activó el proveedor {provider}")
+
+
         serializer = self.serializer_class(provider)
         return Response(serializer.data)
+
+
+class InventoryMovementView(ModelViewSet):
+    http_method_names = ('get', 'post', 'put', 'delete')
+    queryset = InventoryMovement.objects.select_related(
+        "created_by").prefetch_related("inventory_movement_items")
+    serializer_class = InventoryMovementSerializer
+    permission_classes = (IsAuthenticatedCustom,)
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        data = self.request.query_params.dict()
+        data.pop("page", None)
+        keyword = data.pop("keyword", None)
+        results = filter_company(self.queryset, self.request.user.company_id).filter(**data)
+
+        if keyword:
+            search_fields = (
+                "created_by__fullname", "event_type", "state", "inventory__name"
+            )
+            query = get_query(keyword, search_fields)
+            results = results.filter(query)
+
+        return results.order_by('id')
+
+    def create(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                request.data.update({"created_by_id": request.user.id})
+                request.data.update({"company_id": request.user.company_id})
+
+                if request.data.get("state") != "pending" and request.data.get("state") is not None:
+                    raise Exception("El estado inicial del movimiento debe ser pendiente")
+
+                movement_items = request.data.get("inventory_movement_items")
+                for item in movement_items:
+                    inventory = Inventory.objects.filter(pk=item.get("inventory_id")).first()
+
+                    try:
+                        manage_inventories(inventory, item.get("quantity"),
+                                           request.data.get("origin"), request.data.get("destination"),
+                                           request.data.get("event_type"), mode="check")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                add_user_activity(request.user,
+                                  f"{request.user.fullname} creó un movimiento de inventario "
+                                  f"de {request.data.get('event_type')}")
+                return super().create(request, *args, **kwargs)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def update(self, request, pk):
+        try:
+            with transaction.atomic():
+                request.data.update({"company_id": request.user.company_id})
+                movement = self.get_queryset().filter(pk=pk).first()
+
+                if movement is None:
+                    return Response({'error': 'Movimiento de inventario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+                if movement.state != "pending":
+                    return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+
+                origin = request.data.get("origin")
+                destination = request.data.get("destination")
+                event_type = request.data.get("event_type")
+                movement_items = request.data.get("inventory_movement_items") if request.data.get("inventory_movement_items") \
+                    else InventoryMovementItem.objects.filter(inventory_movement_id=movement.id).values()
+
+                for item in movement_items:
+                    inventory = Inventory.objects.filter(pk=item.get("inventory_id")).first()
+                    try:
+                        manage_inventories(inventory, item.get("quantity"),
+                                           origin, destination, event_type, mode="check")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                serializer = self.serializer_class(movement, data=request.data)
+                if serializer.is_valid():
+                    serializer.save()
+                    add_user_activity(request.user,
+                                      f"{request.user.fullname} actualizó el movimiento de inventario "
+                                      f"de {request.data.get('event_type')}")
+                    return Response(serializer.data)
+                return Response(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def destroy(self, request, pk):
+        movement = self.get_queryset().filter(pk=pk).first()
+
+        if movement is None:
+            return Response({'error': 'Movimiento de inventario no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        movement.delete()
+        add_user_activity(request.user,
+                          f"{request.user.fullname} eliminó el movimiento de inventario "
+                          f"de {movement.event_type}")
+        return Response({"message": "Movimiento de inventario eliminado satisfactoriamente"},
+                        status=status.HTTP_200_OK)
+
+    def change_state(self, request, pk, state):
+        try:
+            with transaction.atomic():
+                movement = self.get_queryset().filter(pk=pk).first()
+                
+                if state not in ["approve", "reject", "override"]:
+                    return Response({'error': 'Tipo de acción no válida'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if movement is None:
+                    return Response({'error': 'Movimiento de inventario no encontrado'},
+                                    status=status.HTTP_404_NOT_FOUND)
+                  
+                if state == "approve":
+                    try:
+                        if movement.state != "pending":
+                            return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                            status=status.HTTP_400_BAD_REQUEST)
+
+                        movement_items = InventoryMovementItem.objects.filter(inventory_movement_id=movement.id,
+                                                                              state="pending").all()
+                        for item in movement_items:
+                            manage_inventories(item.inventory, item.quantity,
+                                               movement.origin, movement.destination, movement.event_type,
+                                               mode="approval")
+                            item.state = "approved"
+                            item.save()
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement.state = "approved"
+                    movement.save()
+                    serializer = self.serializer_class(movement)
+                    return Response(serializer.data)
+                elif state == "override":
+                    if movement.state != "approved":
+                        return Response({'error': 'Movimiento no aprobado, solo se puede invalidar movimientos aprobados'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        movement_items = InventoryMovementItem.objects.filter(inventory_movement_id=movement.id,
+                                                                              state="approved").all()
+                        for item in movement_items:
+                            if item.state != "approved":
+                                return Response(
+                                    {'error': 'Movimiento no aprobado, solo se puede invalidar movimientos aprobados'},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                            manage_inventories(item.inventory, item.quantity,
+                                               movement.origin, movement.destination, movement.event_type,
+                                               mode="override")
+                            item.state = "overrided"
+                            item.save()
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement.state = "overrided"
+                    movement.save()
+                    serializer = self.serializer_class(movement)
+                    return Response(serializer.data)
+                else:
+                    if movement.state != "pending":
+                        return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                    movement.state = "rejected"
+                    movement.save()
+                    serializer = self.serializer_class(movement)
+                    return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def change_state_item(self, request, pk, state):
+        try:
+            with transaction.atomic():
+                movement_item = InventoryMovementItem.objects.filter(pk=pk).first()
+
+                if state not in ["approve", "reject", "override"]:
+                    return Response({'error': 'Tipo de acción no válida'}, status=status.HTTP_400_BAD_REQUEST)
+
+                if movement_item is None:
+                    return Response({'error': 'Producto de Movimiento no encontrado'},
+                                    status=status.HTTP_404_NOT_FOUND)
+
+                movement = InventoryMovement.objects.filter(pk=movement_item.inventory.id, state="pending").first()
+
+                if state == "approve":
+                    if movement_item.state != "pending" or movement.state != "pending":
+                        return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        manage_inventories(movement_item.inventory, movement_item.quantity,
+                                           movement.origin, movement.destination, movement.event_type,
+                                           mode="approval")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement_item.state = "approved"
+                    movement_item.save()
+                    serializer = InventoryMovementItemSerializer(movement_item)
+                    return Response(serializer.data)
+                elif state == "override":
+                    if movement_item.state != "approved":
+                        return Response({'error': 'Movimiento no aprobado, solo se puede invalidar movimientos aprobados'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        print("Overriding changes")
+                        manage_inventories(movement_item.inventory, movement_item.quantity,
+                                           movement.origin, movement.destination, movement.event_type,
+                                           mode="override")
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+                    movement_item.state = "overrided"
+                    movement_item.save()
+                    serializer = InventoryMovementItemSerializer(movement_item)
+                    return Response(serializer.data)
+                else:
+                    if movement_item.state != "pending" or movement.state != "pending":
+                        return Response({'error': 'Movimiento de inventario ya aprobado o rechazado'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+
+                    movement_item.state = "rejected"
+                    movement_item.save()
+                    serializer = InventoryMovementItemSerializer(movement_item)
+                    return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CustomerView(ModelViewSet):
@@ -169,7 +415,7 @@ class CustomerView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"{request.user.fullname} creó el cliente: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó el cliente {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk):
@@ -182,14 +428,14 @@ class CustomerView(ModelViewSet):
         serializer = self.serializer_class(customer, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"Actualizar cliente: {request.data.get('name')}")
+            add_user_activity(request.user, f"Actualizó el cliente {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk):
         customer = self.get_queryset().filter(pk=pk).first()
         customer.delete()
-        add_user_activity(request.user, f"{request.user.fullname} creó el cliente: {customer}")
+        add_user_activity(request.user, f"Eliminó el cliente {customer}")
         return Response({"message": "Cliente eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
@@ -223,12 +469,17 @@ class InventoryGroupView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"{request.user.fullname} creó una nueva categoría: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó la categoría {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
         request.data.update({"company_id": request.user.company_id})
         inventory_group = self.get_queryset().filter(pk=pk).first()
+
+        if int(request.data.get("belongs_to_id")) == int(pk):
+            print("No puede seleccionar una categoría como su propio padre")
+            return Response({'error': 'No puede seleccionar una categoría como su propio padre'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if inventory_group is None:
             return Response({'error': 'Categoría no encontrada'}, status=status.HTTP_404_NOT_FOUND)
@@ -237,14 +488,14 @@ class InventoryGroupView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             add_user_activity(request.user,
-                              f"{request.user.fullname} actualizó la categoría: {request.data.get('name')}")
+                              f"Actualizó la categoría {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         inventory_group = self.get_queryset().filter(pk=pk).first()
         inventory_group.delete()
-        add_user_activity(request.user, f"{request.user.fullname} eliminó la categoría: {inventory_group}")
+        add_user_activity(request.user, f"Eliminó la categoría {inventory_group}")
         return Response({"message": "Categoría eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
     def toggle_active(self, request, pk=None):
@@ -265,6 +516,12 @@ class InventoryGroupView(ModelViewSet):
 
         inventory_group.active = not inventory_group.active
         inventory_group.save()
+
+        if inventory_group.active is False:
+            add_user_activity(request.user, f"Desactivó la categoría {inventory_group}")
+        else:
+            add_user_activity(request.user, f"Activó la categoría {inventory_group}")
+
         serializer = self.serializer_class(inventory_group)
         return Response(serializer.data)
 
@@ -295,7 +552,7 @@ class PaymentTerminalView(ModelViewSet):
     def create(self, request, *args, **kwargs):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
-        add_user_activity(request.user, f"{request.user.fullname} creó el datafono: {request.data.get('name')}")
+        add_user_activity(request.user, f"Creó el datafono {request.data.get('name')}")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -309,13 +566,13 @@ class PaymentTerminalView(ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             add_user_activity(request.user,
-                              f"{request.user.fullname} actualizó el datafono: {request.data.get('name')}")
+                              f"Actualizó el datafono {request.data.get('name')} ({request.data})")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         terminal = self.get_queryset().filter(pk=pk).first()
-        add_user_activity(request.user, f"{request.user.fullname} eliminó el datafono: {terminal}")
+        add_user_activity(request.user, f"Eliminó el datafono {terminal.name}")
         terminal.delete()
         return Response({"message": "Datafono eliminado satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -326,6 +583,12 @@ class PaymentTerminalView(ModelViewSet):
 
         terminal.active = not terminal.active
         terminal.save()
+
+        if terminal.active is False:
+            add_user_activity(request.user, f"Desactivó el datafono {terminal.name}")
+        else:
+            add_user_activity(request.user, f"Activó el datafono {terminal.name}")
+
         serializer = self.serializer_class(terminal)
         return Response(serializer.data)
 
@@ -358,7 +621,8 @@ class InvoiceView(ModelViewSet):
         try:
             with transaction.atomic():
                 request.data.update({"company_id": request.user.company_id})
-                dian_resolution = filter_company(DianResolution.objects, self.request.user.company_id).filter(active=True).first()
+                dian_resolution = filter_company(DianResolution.objects, self.request.user.company_id).filter(
+                    active=True).first()
                 if not dian_resolution:
                     raise Exception("Necesita una Resolución de la DIAN activa para crear facturas")
 
@@ -378,7 +642,7 @@ class InvoiceView(ModelViewSet):
                 invoice = super().create(request, *args, **kwargs)
 
                 add_user_activity(request.user,
-                                  f"{request.user.fullname} creó la factura: {request.data.get('invoice_number')}")
+                                  f"Creó la factura {request.data.get('invoice_number')}")
 
                 return Response({"message": "Factura creada satisfactoriamente", "data": invoice.data},
                                 status=status.HTTP_201_CREATED)
@@ -439,7 +703,7 @@ class UpdateInvoiceView(APIView):
             inventory_item.save()
 
         invoice.save()
-        add_user_activity(request.user, f"{request.user.fullname} actualizó la factura: {invoice.invoice_number}")
+        add_user_activity(request.user, f"Actualizó la factura {invoice.invoice_number}")
         return Response({"message": "Factura actualizada satisfactoriamente"}, status=status.HTTP_200_OK)
 
 
@@ -508,7 +772,7 @@ class InventoryCSVLoaderView(ModelViewSet):
         data_validation.is_valid(raise_exception=True)
         data_validation.save()
 
-        add_user_activity(request.user, f"{request.user.fullname} ingresó productos mediante archivo CSV")
+        add_user_activity(request.user, f"Ingresó productos mediante archivo CSV")
 
         return Response({
             "success": "Productos creados satisfactoriamente"
@@ -553,7 +817,7 @@ class DianResolutionView(ModelViewSet):
             raise Exception("No puede tener más de una Resolución de la DIAN activa, "
                             "por favor, desactive primero la actual")
         add_user_activity(request.user,
-                          f"{request.user.fullname} creó una nueva resolución '{request.data.get('document_number')}' valida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
+                          f"Creó la resolución '{request.data.get('document_number')}' válida desde '{request.data.get('from_date')}' hasta '{request.data.get('to_date')}'")
         return super().create(request, *args, **kwargs)
 
     def update(self, request, pk=None):
@@ -575,12 +839,12 @@ class DianResolutionView(ModelViewSet):
             return Response(serializer.data)
 
         add_user_activity(request.user,
-                          f"{request.user.fullname} actualizó la resolución '{request.data.get('document_number')}'")
+                          f"Actualizó la resolución '{request.data.get('document_number')}' ({request.data})")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None):
         dian_res = self.get_queryset().filter(pk=pk).first()
-        add_user_activity(request.user, f"{request.user.fullname} eliminó la resolución '{dian_res.document_number}'")
+        add_user_activity(request.user, f"Eliminó la resolución '{dian_res.document_number}'")
         dian_res.delete()
         return Response({"message": "Resolución DIAN eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -602,10 +866,10 @@ class DianResolutionView(ModelViewSet):
 
         if resolution.active == True:
             add_user_activity(request.user,
-                              f"{request.user.fullname} activó la resolución '{resolution.document_number}'")
+                              f"Activó la resolución '{resolution.document_number}'")
         else:
             add_user_activity(request.user,
-                              f"{request.user.fullname} desactivó la resolución '{resolution.document_number}'")
+                              f"Desactivó la resolución '{resolution.document_number}'")
 
         return Response(serializer.data)
 
@@ -635,18 +899,10 @@ class GoalView(ModelViewSet):
         request.data.update({"created_by_id": request.user.id})
         request.data.update({"company_id": request.user.company_id})
 
-        if request.data.get('goal_type') == 'diary':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} creó una nueva meta diaria de {request.data.get('goal_value')}")
-        elif request.data.get('goal_type') == 'weekly':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} creó una nueva meta semanal de {request.data.get('goal_value')}")
-        elif request.data.get('goal_type') == 'monthly':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} creó una nueva meta mensual de {request.data.get('goal_value')}")
-        elif request.data.get('goal_type') == 'annual':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} creó una nueva meta anual de {request.data.get('goal_value')}")
+        goals = {"diary": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
+
+        add_user_activity(request.user,
+                              f"Creó la meta {goals.get(request.data.get('goal_type'))} de {request.data.get('goal_value')}")
 
         return super().create(request, *args, **kwargs)
 
@@ -659,19 +915,10 @@ class GoalView(ModelViewSet):
 
         serializer = self.serializer_class(goal, data=request.data)
         if serializer.is_valid():
-            if request.data.get('goal_value') != goal.goal_value:
-                if request.data.get('goal_type') == 'diary':
-                    add_user_activity(request.user,
-                                      f"{request.user.fullname} actualizó la meta diaria de {goal.goal_value} a {request.data.get('goal_value')}")
-                elif request.data.get('goal_type') == 'weekly':
-                    add_user_activity(request.user,
-                                      f"{request.user.fullname} actualizó la meta semanal de {goal.goal_value} a {request.data.get('goal_value')}")
-                elif request.data.get('goal_type') == 'monthly':
-                    add_user_activity(request.user,
-                                      f"{request.user.fullname} actualizó la meta mensual de {goal.goal_value} a {request.data.get('goal_value')}")
-                elif request.data.get('goal_type') == 'annual':
-                    add_user_activity(request.user,
-                                      f"{request.user.fullname} actualizó la meta anual de {goal.goal_value} a {request.data.get('goal_value')}")
+            goals = {"diary": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
+
+            add_user_activity(request.user,
+                              f"Actualizó la meta {goals.get(request.data.get('goal_type'))} de {goal.goal_value} a {request.data.get('goal_value')}")
             serializer.save()
             return Response(serializer.data)
 
@@ -679,18 +926,9 @@ class GoalView(ModelViewSet):
 
     def destroy(self, request, pk=None):
         goal = self.get_queryset().filter(pk=pk).first()
-        if goal.goal_type == 'diary':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} eliminó la meta diaria de {request.data.get('goal_value')}")
-        elif goal.goal_type == 'weekly':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} eliminó la meta semanal de {request.data.get('goal_value')}")
-        elif goal.goal_type == 'monthly':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} eliminó la meta mensual de {request.data.get('goal_value')}")
-        elif goal.goal_type == 'annual':
-            add_user_activity(request.user,
-                              f"{request.user.fullname} eliminó la meta anual de {request.data.get('goal_value')}")
+        goals = {"diary": "diaria", "weekly": "semanal", "monthly": "mensual", "annual": "anual"}
+        add_user_activity(request.user,
+                              f"Eliminó la meta {goals.get(request.data.get('goal_type'))} de {request.data.get('goal_value')}")
         goal.delete()
         return Response({"message": "Meta eliminada satisfactoriamente"}, status=status.HTTP_200_OK)
 
@@ -740,7 +978,7 @@ class InvoicePaymentMethodsView(APIView):
                     new_payment_methods.append(method.get("name"))
 
                 add_user_activity(request.user,
-                                  f"{request.user.fullname} actualizó los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
+                                  f"Actualizó los métodos de pago '{old_payment_methods}' a '{new_payment_methods}'")
 
                 if 'payment_terminal_id' in request.data:
                     invoice.payment_terminal_id = request.data.get("payment_terminal_id", None)

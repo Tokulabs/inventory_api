@@ -435,7 +435,8 @@ def create_product_sales_report(ws, report_data, report_data_nulled, report_data
         ws.cell(row=len(report_data) + 7, column=2, value="TOTAL")
         ws.cell(row=len(report_data) + 7, column=3, value=total_formula)
 
-        apply_styles_to_cells(start_column=1, start_row=len(report_data) + 7, end_column=3, end_row=len(report_data) + 7,
+        apply_styles_to_cells(start_column=1, start_row=len(report_data) + 7, end_column=3,
+                              end_row=len(report_data) + 7,
                               ws=ws,
                               font=headers_font, alignment=None, fill=None, border=None)
 
@@ -498,14 +499,23 @@ def create_invoices_report(ws, report_data):
     for row in range(2, len(report_data) + 2):
         ws[f"{get_column_letter(6)}{row}"].number_format = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)'
 
+
 def electronic_invoice_report(ws, report_data):
-    column_titles = ["Empresa","Tipo Documento","prefijo","DocumentoNúmero","Fecha","Tercero Interno","Tercero Externo","Nota",
-                  "FormaDePago","FechaEntrega","DocExternoPrefijo","NúmDocumentoExterno","Verificado","Anulado","Personalizado1",
-                  "Personalizado2","Personalizado3","Personalizado4","Personalizado5","Personalizado6","Personalizado7","Personalizado8",
-                  "Personalizado9","Personalizado10","Personalizado11","Personalizado12","Personalizado13","Personalizado14","Personalizado15",
-                  "Sucursal","Clasificación","Producto","Bodega","UnidadDeMedida","Cantidad","Iva","Valor","Descuento","Vencimiento","Nota Detalle",
-                  "Centro Costos","Personalizado1Det","Personalizado2Det","Personalizado3Det","Personalizado4Det","Personalizado5Det","Personalizado6Det",
-                  "Personalizado7Det","Personalizado8Det","Personalizado9Det","Personalizado10Det","Personalizado11Det","Personalizado12Det","Personalizado13Det","Personalizado14Det","Personalizado15Det"]
+    column_titles = ["Empresa", "Tipo Documento", "prefijo", "DocumentoNúmero", "Fecha", "Tercero Interno",
+                     "Tercero Externo", "Nota",
+                     "FormaDePago", "FechaEntrega", "DocExternoPrefijo", "NúmDocumentoExterno", "Verificado", "Anulado",
+                     "Personalizado1",
+                     "Personalizado2", "Personalizado3", "Personalizado4", "Personalizado5", "Personalizado6",
+                     "Personalizado7", "Personalizado8",
+                     "Personalizado9", "Personalizado10", "Personalizado11", "Personalizado12", "Personalizado13",
+                     "Personalizado14", "Personalizado15",
+                     "Sucursal", "Clasificación", "Producto", "Bodega", "UnidadDeMedida", "Cantidad", "Iva", "Valor",
+                     "Descuento", "Vencimiento", "Nota Detalle",
+                     "Centro Costos", "Personalizado1Det", "Personalizado2Det", "Personalizado3Det",
+                     "Personalizado4Det", "Personalizado5Det", "Personalizado6Det",
+                     "Personalizado7Det", "Personalizado8Det", "Personalizado9Det", "Personalizado10Det",
+                     "Personalizado11Det", "Personalizado12Det", "Personalizado13Det", "Personalizado14Det",
+                     "Personalizado15Det"]
     add_values_to_row_multiple_columns(1, 1, column_titles, ws)
     apply_styles_to_cells(start_column=1, start_row=1, end_column=len(column_titles), end_row=1, ws=ws,
                           font=headers_font, alignment=alignment, fill=headers_fill, border=border_style)
@@ -520,27 +530,34 @@ def electronic_invoice_report(ws, report_data):
     for column in [5, 10, 39]:
         for cell in ws[get_column_letter(column)]:
             cell.number_format = "DD/MM/YYYY"
-    
+
     for cell in ws[get_column_letter(38)]:
         cell.number_format = '0.00'
 
+
 def clients_report(ws, report_data):
-    column_titles = ["Tipo Identificación","No. Identificación","Ciudad Identificación","1er. Nombre o Razón Social ","2do. Nombre","1re. Apellido","2do.Apellido","Propiedad Activa",
-                    "Activo","Propiedad Retención","Fecha Creación","Plazo","Clasificación Dian","Actividad Económica","Matricula","Tipos_Responsabilidades","Aplica ReteIca"," % Ica",
-                    "Maneja Cupo Crédito","Cupo Crédito","Código","Fecha Aniversario","Forma de Pago","Lista Precios","Nota"," % Descuento","Vendedor","Clasificación Uno","Clasificación Dos",
-                    "Clasificación Tres","Zona Uno","Zona Dos","Personalizado 1","Personalizado 2","Personalizado 3","Personalizado 4","Personalizado 5","Personalizado 6","Personalizado 7",
-                    "Personalizado 8","Personalizado 9","Personalizado 10","Personalizado 11","Personalizado 12","Personalizado 13","Personalizado 14","Personalizado 15","Tipo Dirección",
-                    "Ciudad Dirección","Dirección","Dirección Principal","Teléfonos","Código Postal","Fax ","Movil 1","Movil 2","E_Mail ","E_Mail 2","E_Mail 3","Página Web","Observaciones","Sucursal"]
-    
+    column_titles = ["Tipo Identificación", "No. Identificación", "Ciudad Identificación",
+                     "1er. Nombre o Razón Social ", "2do. Nombre", "1re. Apellido", "2do.Apellido", "Propiedad Activa",
+                     "Activo", "Propiedad Retención", "Fecha Creación", "Plazo", "Clasificación Dian",
+                     "Actividad Económica", "Matricula", "Tipos_Responsabilidades", "Aplica ReteIca", " % Ica",
+                     "Maneja Cupo Crédito", "Cupo Crédito", "Código", "Fecha Aniversario", "Forma de Pago",
+                     "Lista Precios", "Nota", " % Descuento", "Vendedor", "Clasificación Uno", "Clasificación Dos",
+                     "Clasificación Tres", "Zona Uno", "Zona Dos", "Personalizado 1", "Personalizado 2",
+                     "Personalizado 3", "Personalizado 4", "Personalizado 5", "Personalizado 6", "Personalizado 7",
+                     "Personalizado 8", "Personalizado 9", "Personalizado 10", "Personalizado 11", "Personalizado 12",
+                     "Personalizado 13", "Personalizado 14", "Personalizado 15", "Tipo Dirección",
+                     "Ciudad Dirección", "Dirección", "Dirección Principal", "Teléfonos", "Código Postal", "Fax ",
+                     "Movil 1", "Movil 2", "E_Mail ", "E_Mail 2", "E_Mail 3", "Página Web", "Observaciones", "Sucursal"]
+
     add_values_to_row_multiple_columns(1, 1, column_titles, ws)
-    
+
     for column in range(1, 62):
         ws.column_dimensions[get_column_letter(column)].width = 20
-    
+
     for row_idx, row_data in enumerate(report_data, start=2):
         for col_idx, cell_value in enumerate(row_data, start=1):
             ws.cell(row=row_idx, column=col_idx, value=cell_value)
-    
+
     for column in [11]:
         for cell in ws[get_column_letter(column)]:
             cell.number_format = "DD/MM/YYYY"
@@ -577,3 +594,25 @@ def electronic_invoice_report_by_invoice(ws, payment_methods_data, amount_data):
         cell.number_format = '0.00'
 
     ws.delete_cols(3, 2)
+
+
+def manage_inventories(inventory, quantity, origin, destination, event, mode="approval"):
+    if event == "purchase" and destination == "warehouse" and origin is None:
+        inventory.total_in_storage += quantity if mode == "approval" else -quantity if mode == "override" else 0
+    elif event == "purchase" and destination == "store" and origin is None:
+        inventory.total_in_shops += quantity if mode == "approval" else -quantity if mode == "override" else 0
+    elif event == "shipment" and destination == "warehouse" and origin == "store":
+        inventory.total_in_storage += quantity if mode == "approval" else -quantity if mode == "override" else 0
+        inventory.total_in_shops -= quantity if mode == "approval" else -quantity if mode == "override" else 0
+    elif event == "shipment" and destination == "store" and origin == "warehouse":
+        inventory.total_in_storage -= quantity if mode == "approval" else -quantity if mode == "override" else 0
+        inventory.total_in_shops += quantity if mode == "approval" else -quantity if mode == "override" else 0
+    elif event == "return" and origin == "warehouse" and destination is None:
+        inventory.total_in_storage -= quantity if mode == "approval" else -quantity if mode == "override" else 0
+    elif event == "return" and origin == "store" and destination is None:
+        inventory.total_in_shops -= quantity if mode == "approval" else -quantity if mode == "override" else 0
+    else:
+        raise Exception("Evento invalido revisar tipo, origen y destino")
+
+    inventory.save() if mode == "approval" or mode == "override" else None
+

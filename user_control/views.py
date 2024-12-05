@@ -1,14 +1,18 @@
+from django.db import transaction
+from django.http import JsonResponse
+from rest_framework.decorators import api_view
+from rest_framework.status import HTTP_200_OK
 from rest_framework.viewsets import ModelViewSet
 
+from .cognito_utils import authenticate_user, handle_new_password_required, forgot_password, confirm_forgot_password, \
+    handle_password_update, create_cognito_user, verify_email_send, verify_email
 from .models import Company
-from .serializers import (CreateUserSerializer, CustomUser,
-                          LoginSerializer, UpdatePasswordSerializer, CustomUserSerializer, UserActivitiesSerializer,
+from .serializers import (CreateUserSerializer, CustomUser, CustomUserSerializer, UserActivitiesSerializer,
                           UserActivities, CompanySerializer)
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import authenticate
 from datetime import datetime
-from inventory_api.utils import get_access_token, CustomPagination, get_query, filter_company
+from inventory_api.utils import CustomPagination, get_query, filter_company
 from inventory_api.custom_methods import IsAuthenticatedCustom
 
 
@@ -22,6 +26,99 @@ def add_user_activity(user, action):
     )
 
 
+def add_user_activity_from_email(email, action):
+    user = CustomUser.objects.all().filter(email=email).first()
+    user.last_login = datetime.now()
+    user.save()
+    add_user_activity(user, action)
+
+
+@api_view(['POST'])
+def login_view(request):
+    email = request.data.get('email')
+    password = request.data.get('password')
+
+    auth_result = authenticate_user(email, password)
+
+    if isinstance(auth_result, Response):
+        return auth_result
+
+    if 'ChallengeName' in auth_result:
+        return JsonResponse({
+            "session": auth_result['Session']
+        },
+            status=HTTP_200_OK
+        )
+    elif not auth_result:
+        return JsonResponse({"error": "Invalid credentials"}, status=401)
+    else:
+        access_token = auth_result['AccessToken']
+
+        response = JsonResponse({
+            "access": access_token
+        })
+
+        user = CustomUser.objects.all().filter(email=email).first()
+
+        if user.is_active is False:
+            return JsonResponse({"error": "Error al iniciar sesión"}, status=401)
+
+        user.last_login = datetime.now()
+        user.save()
+
+        add_user_activity_from_email(email, "Nuevo inicio de sesión")
+
+        return response
+
+
+@api_view(['POST'])
+def password_required_view(request):
+    if request.method == 'POST':
+        new_password = request.data.get('new_password')
+        email = request.data.get('email')
+        session = request.data.get('session')
+
+        response = handle_new_password_required(email, new_password, session)
+
+        if response.status_code == 200:
+            add_user_activity_from_email(email, "Cambio de contraseña obligatorio completado")
+
+        return response
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@api_view(['POST'])
+def forgot_password_view(request):
+    if request.method == 'POST':
+        email = request.data.get('email')
+        response = forgot_password(email)
+
+        if response.status_code == 200:
+            add_user_activity_from_email(email, "Olvido de contraseña - email enviado")
+
+        return response
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
+@api_view(['POST'])
+def confirm_forgot_password_view(request):
+    if request.method == 'POST':
+        email = request.data.get('email')
+        confirmation_code = request.data.get('confirmation_code')
+        new_password = request.data.get('new_password')
+
+        response = confirm_forgot_password(email, confirmation_code, new_password)
+
+        if response.status_code == 200:
+            add_user_activity_from_email(email, "Olvido de contraseña - contraseña actualizada")
+
+        return response
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
+
+
 class CreateUserView(ModelViewSet):
     http_method_names = ["post"]
     queryset = CustomUser.objects.all()
@@ -29,91 +126,81 @@ class CreateUserView(ModelViewSet):
     permission_classes = (IsAuthenticatedCustom,)
 
     def create(self, request):
-        request.data.update({"company_id": request.user.company_id})
-        valid_request = self.serializer_class(data=request.data)
-        valid_request.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                request.data.update({"company_id": request.user.company_id})
+                valid_request = self.serializer_class(data=request.data)
+                valid_request.is_valid(raise_exception=True)
 
-        CustomUser.objects.create(**valid_request.validated_data)
+                try:
+                    CustomUser.objects.create(**valid_request.validated_data)
+                except Exception:
+                    return Response({"error": "Usuario ya existe"},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
-        print(request.user.fullname)
+                sub = create_cognito_user(request.data.get("email"))
+                valid_request.validated_data.update({"sub": sub})
 
-        add_user_activity(request.user, f"Nuevo usuario creado por: '{request.user.fullname}'")
-        
-        return Response(
-            {"success": "Usuario creado satisfactoriamente"},
-            status=status.HTTP_201_CREATED
-        )
+                add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
 
-
-class LoginView(ModelViewSet):
-    http_method_names = ["post"]
-    queryset = CustomUser.objects.all()
-    serializer_class = LoginSerializer
-
-    def create(self, request):
-        valid_request = self.serializer_class(data=request.data)
-        valid_request.is_valid(raise_exception=True)
-
-        new_user = valid_request.validated_data["is_new_user"]
-
-        if new_user:
-            user = CustomUser.objects.filter(
-                email=valid_request.validated_data["email"]
-            )
-
-            if user:
-                user = user[0]
-                if not user.password:
-                    return Response({"user_id": user.id})
-                else:
-                    raise Exception("El usuario ya tiene contraseña")
-            else:
-                raise Exception("Email de usuario no encontrado")
-
-        user = authenticate(
-            username=valid_request.validated_data["email"],
-            password=valid_request.validated_data.get("password", None)
-        )
-
-        if not user:
-            return Response(
-                {"error": "Email o contraseña invalidas"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        access = get_access_token({"user_id": user.id}, 1)
-
-        user.last_login = datetime.now()
-        user.save()
-
-        add_user_activity(user, f"'{user.fullname}' inició sesión el '{user.last_login}'")
-
-        return Response({"access": access})
+                return Response(
+                    {"success": "Usuario creado satisfactoriamente"},
+                    status=status.HTTP_201_CREATED
+                )
+        except Exception as e:
+            return Response({"error": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UpdatePasswordView(ModelViewSet):
-    serializer_class = UpdatePasswordSerializer
     http_method_names = ["post"]
-    queryset = CustomUser.objects.all()
+    permission_classes = (IsAuthenticatedCustom,)
 
-    def create(self, request):
-        valid_request = self.serializer_class(data=request.data)
-        valid_request.is_valid(raise_exception=True)
+    def update_password(self, request):
+        if request.method == 'POST':
+            access_token = request.META.get("HTTP_AUTHORIZATION", None)
 
-        user = CustomUser.objects.filter(
-            id=valid_request.validated_data["user_id"])
+            if access_token is None:
+                return JsonResponse({"error": "No access token provided"}, status=401)
 
-        if not user:
-            raise Exception("Id de usuario no encontrado")
+            old_password = request.data.get('old_password')
+            new_password = request.data.get('new_password')
+            access_token = access_token.split(" ")[1]
 
-        user = user[0]
+            response = handle_password_update(access_token, old_password, new_password)
 
-        user.set_password(valid_request._validated_data["password"])
-        user.save()
+            add_user_activity(request.user, "El usuario actualizó su contraseña")
 
-        add_user_activity(user, f"El usuario '{user.fullname}' actualizó su contraseña")
+            return response
 
-        return Response({"success": "Contraseña actualizada"})
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    def verify_email_view(self, request):
+        if request.method == 'POST':
+            access_token = request.META.get("HTTP_AUTHORIZATION", None)
+            access_token = access_token.split(" ")[1]
+            response = verify_email_send(access_token)
+
+            return response
+
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    def verify_email_confirmation_view(self, request):
+        if request.method == 'POST':
+            access_token = request.META.get("HTTP_AUTHORIZATION", None)
+            access_token = access_token.split(" ")[1]
+            code = request.data.get('code')
+            response = verify_email(access_token, code)
+
+            if response.status_code == 200:
+                user = request.user
+                user.is_verified = True
+                user.save()
+
+                add_user_activity(request.user, "El usuario verificó su correo electrónico")
+
+            return response
+
+        return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
 class MeView(ModelViewSet):
@@ -176,7 +263,7 @@ class UsersView(ModelViewSet):
         serializer = self.serializer_class(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            add_user_activity(request.user, f"Usuario '{request.user.fullname}' Actualizado")
+            add_user_activity(request.user, f"El usuario fué actualizado '{request.data}'")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -189,13 +276,18 @@ class UsersView(ModelViewSet):
         user.save()
 
         serializer = self.serializer_class(user)
+
+        if user.is_active is False:
+            add_user_activity(request.user, f"Usuario {(serializer.data.get('email'))} desactivado")
+        else:
+            add_user_activity(request.user, f"Usuario {(serializer.data.get('email'))} activado")
         return Response(serializer.data)
 
 
 class CompanyView(ModelViewSet):
     serializer_class = CompanySerializer
     queryset = Company.objects.all()
-    http_method_names = ("get", "post", "put", "delete")
+    http_method_names = ("get", "post", "put")
     permission_classes = (IsAuthenticatedCustom,)
     pagination_class = CustomPagination
 
@@ -212,3 +304,21 @@ class CompanyView(ModelViewSet):
             query = get_query(keyword, search_fields)
             results = results.filter(query)
         return results
+
+    def update(self, request, pk=None):
+        if not request.user.is_superuser:
+            return Response(
+                {"error": "No tienes permisos para realizar esta acción"},
+                status=status.HTTP_403_FORBIDDEN)
+
+        company = self.queryset.filter(pk=pk).first()
+
+        if company is None:
+            return Response({'error': 'Compañía no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.serializer_class(company, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            add_user_activity(request.user, f"Empresa '{company.name}' Actualizada")
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
