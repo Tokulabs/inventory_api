@@ -48,7 +48,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'user_control',
     'app_control',
-    'einvoice_control'
 ]
 
 MIDDLEWARE = [
@@ -106,6 +105,9 @@ AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME')
 AWS_REGION_NAME = config('AWS_REGION_NAME')
+USER_POOL_ID = config('USER_POOL_ID')
+CLIENT_ID = config('CLIENT_ID')
+COGNITO_PUBLIC_KEYS_URL = config('COGNITO_PUBLIC_KEYS_URL')
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
