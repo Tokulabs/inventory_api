@@ -133,13 +133,14 @@ class CreateUserView(ModelViewSet):
                 valid_request.is_valid(raise_exception=True)
 
                 try:
-                    CustomUser.objects.create(**valid_request.validated_data)
+                    user = CustomUser.objects.create(**valid_request.validated_data)
                 except Exception:
                     return Response({"error": "Usuario ya existe"},
                                     status=status.HTTP_400_BAD_REQUEST)
 
                 sub = create_cognito_user(request.data.get("email"))
-                valid_request.validated_data.update({"sub": sub})
+                user.sub = sub
+                user.save()
 
                 add_user_activity(request.user, f"Nuevo usuario creado {request.data.get('email')}")
 
