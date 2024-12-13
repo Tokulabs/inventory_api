@@ -61,10 +61,12 @@ def create_cognito_user(email):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
 
+
 def calculate_secret_hash(username):
     message = username + settings.CLIENT_ID
     dig = hmac.new(settings.CLIENT_SECRET.encode(), message.encode(), hashlib.sha256).digest()
     return base64.b64encode(dig).decode()
+
 
 def authenticate_user(email, password):
     try:
